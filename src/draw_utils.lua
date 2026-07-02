@@ -1,14 +1,79 @@
 local imgs = {}
 
-local files = love.filesystem.getDirectoryItems('img')
-for i = 1, #files do
-  local file = files[i]
-  if file:sub(-4) == '.png' or file:sub(-4) == '.jpg' then
-    local name = file:sub(1, #file - 4)
-    local img = love.graphics.newImage('img/' .. file)
-    imgs[name] = img
+local img_paths = {}
+local img_data = {}
+
+local imgs_to_load = {}
+local function find_imgs(path)
+  local files = love.filesystem.getDirectoryItems('img' .. path)
+  for i = 1, #files do
+    local basename = files[i]
+    if basename:sub(-4) == '.png' or basename:sub(-4) == '.jpg' then
+      local name = (path .. '/' .. basename:sub(1, #basename - 4)):sub(2)
+      local img_path = 'img' .. path .. '/' .. basename
+      img_paths[name] = img_path
+      imgs_to_load[#imgs_to_load + 1] = name
+    else
+      if love.filesystem.getInfo('img' .. path .. '/' .. basename).type == 'directory' then
+        find_imgs(path .. '/' .. basename)
+      end
+    end
   end
 end
+find_imgs('')
+local is_priority_load = function (name)
+  return name == 'blossom'
+end
+table.sort(imgs_to_load, function (a, b)
+  local a_priority = (is_priority_load(a) and 0 or 1)
+  local b_priority = (is_priority_load(a) and 0 or 1)
+  if a_priority ~= b_priority then return a_priority < b_priority end
+  return a < b
+end)
+local n_prio_imgs = 0
+for i = 1, #imgs_to_load do
+  if not is_priority_load(imgs_to_load[i]) then break end
+  n_prio_imgs = i
+end
+
+local load_single_image = function (name)
+  local use_mipmaps = false
+  local i = love.graphics.newImage(img_data[name], { mipmaps = use_mipmaps })
+  imgs[name] = i
+  return i
+end
+
+local unload_single_image = function (name)
+  imgs[name]:release()
+  imgs[name] = nil
+end
+
+local imgs_to_load_ptr = 0
+local full_npot = love.graphics.getSupported()['fullnpot']
+-- Returns (progress, total, prio_done, name)
+local load_img_step = function ()
+  if imgs_to_load_ptr >= #imgs_to_load then return end
+  imgs_to_load_ptr = imgs_to_load_ptr + 1
+  local name = imgs_to_load[imgs_to_load_ptr]
+  local use_mipmaps = false
+  local data = love.image.newImageData(img_paths[name])
+  if use_mipmaps and not full_npot then
+    -- Extend to power-of-two
+    local w, h = data:getDimensions()
+    local ext_w, ext_h = 1, 1
+    while ext_w < w do ext_w = ext_w * 2 end
+    while ext_h < h do ext_h = ext_h * 2 end
+    local ext_data = love.image.newImageData(ext_w, ext_h)
+    ext_data:paste(data, 0, 0, 0, 0, w, h)
+    data:release()
+    data = ext_data
+  end
+  img_data[name] = data
+  -- XXX: May as well skip if images are large
+  load_single_image(name)
+  return imgs_to_load_ptr, #imgs_to_load, imgs_to_load_ptr >= n_prio_imgs, name
+end
+
 
 local draw = function (drawable, x, y, w, h, ax, ay, r)
   ax = ax or 0.5
@@ -51,6 +116,10 @@ local enclose = function (drawable, w, h, extraOffsX, extraOffsY)
 end
 
 local draw_ = {
+  load_img_step = load_img_step,
+  load = load_single_image,
+  unload = unload_single_image,
+
   get = function (name) return imgs[name] end,
   img = img,
   shadow = shadow,

@@ -50,9 +50,13 @@ end
 _G['global_font'] = fontSizeFactory(nil, {28, 36})
 love.graphics.setFont(_G['global_font'](40))
 
+_G['scene_loading'] = require 'scene_loading'
 _G['scene_intro'] = require 'scene_intro'
 
-local curScene = scene_intro()
+local curScene = scene_loading(function ()
+  -- TODO: Load audio here
+  _G['scene_intro'] = require 'scene_intro'
+end)
 local lastScene = nil
 local transitionTimer = 0
 local currentTransition = nil
