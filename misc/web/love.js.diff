@@ -1,0 +1,21 @@
+https://github.com/Davidobot/love.js.git c4f04e185033a7c9fbefa9be3bec88c41a90421b
+
+diff --git a/src/game.js b/src/game.js
+index 95fd6fd..83750bf 100644
+--- a/src/game.js
++++ b/src/game.js
+@@ -224,12 +224,8 @@ Module.expectedDataFileDownloads++;
+       var byteArray = new Uint8Array(arrayBuffer);
+       var curr;
+ 
+-        // copy the entire loaded file into a spot in the heap. Files will refer to slices in that. They cannot be freed though
+-        // (we may be allocating before malloc is ready, during startup).
+-        if (Module['SPLIT_MEMORY']) Module.printErr('warning: you should run the file packager with --no-heap-copy when SPLIT_MEMORY is used, otherwise copying into the heap may fail due to the splitting');
+-        var ptr = Module['getMemory'](byteArray.length);
+-        Module['HEAPU8'].set(byteArray, ptr);
+-        DataRequest.prototype.byteArray = Module['HEAPU8'].subarray(ptr, ptr+byteArray.length);
++        // Newer Emscripten versions have `FS_createDataFile()` manages memory smartly
++        DataRequest.prototype.byteArray = byteArray;
+ 
+         var files = metadata.files;
+         for (i = 0; i < files.length; ++i) {
