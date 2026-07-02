@@ -85,24 +85,45 @@ function love.mousereleased(x, y, button, istouch, presses)
   mouseScene = nil
 end
 
+local isLCmdDown, isRCmdDown = false, false
+local keyLCmd, keyRCmd =
+  unpack(love.system.getOS() == 'OS X' and {'lgui', 'rgui'} or {'lctrl', 'rctrl'})
+function love.keypressed(key)
+  if key == 'lshift' then
+    if not isMobile and not isWeb then
+      love.window.setFullscreen(not love.window.getFullscreen())
+      updateLogicalDimensions()
+    end
+  elseif key == keyLCmd then isLCmdDown = true
+  elseif key == keyRCmd then isRCmdDown = true
+  elseif key == 'q' and (isLCmdDown or isRCmdDown) then
+    love.event.quit()
+  elseif curScene.key ~= nil then
+    curScene.key(key)
+  end
+end
+function love.keyreleased(key)
+  if key == keyLCmd then isLCmdDown = false
+  elseif key == keyRCmd then isRCmdDown = false
+  elseif curScene.keyrel ~= nil then
+    curScene.keyrel(key)
+  end
+end
+
 local T = 0
 local timeStep = 1 / 240
 
 function love.update(dt)
   T = T + dt
   local count = 0
-  while T > timeStep and count < 4 do
+  while T > timeStep and count < 16 do
     T = T - timeStep
     count = count + 1
     if lastScene ~= nil then
       lastScene:update()
-      -- At most 4 ticks per update for transitions
-      if count <= 4 then
-        transitionTimer = transitionTimer + 1
-      end
-    else
-      curScene:update()
+      transitionTimer = transitionTimer + 1
     end
+    curScene:update()
   end
 end
 
@@ -140,13 +161,4 @@ function love.draw()
     curScene.draw()
   end
   love.graphics.pop()
-end
-
-function love.keypressed(key)
-  if key == 'lshift' then
-    if not isMobile and not isWeb then
-      love.window.setFullscreen(not love.window.getFullscreen())
-      updateLogicalDimensions()
-    end
-  end
 end
