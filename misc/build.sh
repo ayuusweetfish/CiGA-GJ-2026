@@ -5,9 +5,10 @@ wd=$PWD
 cp -pr img main.lua src "$t/"
 (
   cd "$t/" || exit
-  if [ "$1" = "min" ]; then
+  if [ "$1" != "nomin" ]; then
+    echo Minifying
     find . -type f -name '*.lua' | while read i; do
-      node "$wd/misc/luamin-env/node_modules/luamin/bin/luamin" -f "$i" > "$t/_tmp"
+      deno run "$wd/misc/luamin-env/node_modules/luamin/bin/luamin" -c < "$i" > "$t/_tmp"
       mv "$t/_tmp" "$i"
     done
   fi
