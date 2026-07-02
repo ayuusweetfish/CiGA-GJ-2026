@@ -1,0 +1,14 @@
+[project]
+authors = "Game Team 🐟🐐🍎🌰"
+description = ""
+email = "claire@ayu.land"
+package_name = "Game_Name"
+title = "Game Name"
+url = "https://github.com/ayuusweetfish/"
+uti = "land.ayu.gamename"
+version = "v1.0"
+
+[build]
+output_directory = "/tmp/CGJ2026_🐟🐐🍎🌰"
+ignore_list = [ "^Boon.toml" ]
+exclude_default_ignore_list = true
