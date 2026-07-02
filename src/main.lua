@@ -53,8 +53,15 @@ love.graphics.setFont(_G['global_font'](40))
 _G['scene_loading'] = require 'scene_loading'
 _G['scene_intro'] = require 'scene_intro'
 
+local audio = require 'audio'
+local bgm, bgm_update
+
 local curScene = scene_loading(function ()
-  -- TODO: Load audio here
+  bgm, bgm_update = audio.loop(
+    nil, 0,
+    'aud/bg_饭_0523a.ogg', (36 * 3) / (184.5 / 60),
+    1600 * 4)
+  bgm:setVolume(1)
   _G['scene_intro'] = require 'scene_intro'
 end)
 local lastScene = nil
@@ -117,6 +124,8 @@ end
 local T = 0
 local timeStep = 1 / 240
 
+local sinceAudioUpdate = 0
+
 function love.update(dt)
   T = T + dt
   local count = 0
@@ -129,6 +138,13 @@ function love.update(dt)
     end
     curScene:update()
   end
+
+  sinceAudioUpdate = sinceAudioUpdate + dt
+  if sinceAudioUpdate >= 0.5 then
+    sinceAudioUpdate = sinceAudioUpdate - 0.5
+    if bgm_update then bgm_update() end
+  end
+  audio.sfx_update(dt)
 end
 
 transitions['fade'] = function (r, g, b)

@@ -1,5 +1,6 @@
 local draw = require 'draw_utils'
 local button = require 'button'
+local audio = require 'audio'
 
 return function ()
   local s = {}
@@ -10,7 +11,10 @@ return function ()
 
   local btn = button(
     draw.enclose(love.graphics.newText(font(36), 'Start'), 120, 60),
-    function () replaceScene(scene_intro(), transitions['fade'](0.1, 0.1, 0.1)) end
+    function ()
+      replaceScene(_G['scene_intro'](), transitions['fade'](0.1, 0.1, 0.1))
+      audio.sfx('newspaper')
+    end
   )
   btn.x = W * 0.5
   btn.y = H * 0.65
