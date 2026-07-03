@@ -1,5 +1,5 @@
-local draw = require 'draw_utils'
-local button = require 'button'
+local draw = require 'utils/draw'
+local button = require 'utils/button'
 local audio = require 'audio'
 
 return function ()

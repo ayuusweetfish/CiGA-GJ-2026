@@ -1,4 +1,4 @@
-local draw = require 'draw_utils'
+local draw = require 'utils/draw'
 
 return function (complete_fn)
   local s = {}
