@@ -1,6 +1,8 @@
 local draw = require 'utils/draw'
 local audio = require 'audio'
 
+local chain = {}
+
 return function ()
   local s = {}
   local W, H = W, H
