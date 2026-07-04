@@ -13,7 +13,7 @@ local parse_chain = function (box_csv, links_csv)
   end
 
   -- Bounding boxes
-  for line in box_csv:gmatch('[^\n]+') do
+  for line in box_csv:gmatch('[^\n]+') do if line:byte(1, 1) ~= 35 then
     local fields = split_fields(line)
     if #fields >= 6 then
       local imgid = fields[1]
@@ -25,10 +25,10 @@ local parse_chain = function (box_csv, links_csv)
       end
       table.insert(chain[imgid].labels, {label, x1, y1, x2, y2})
     end
-  end
+  end end
 
   -- Links
-  for line in links_csv:gmatch('[^\n]+') do
+  for line in links_csv:gmatch('[^\n]+') do if line:byte(1, 1) ~= 35 then
     local fields = split_fields(line)
     if #fields >= 2 then
       local source = fields[1]
@@ -38,7 +38,7 @@ local parse_chain = function (box_csv, links_csv)
       end
       table.insert(chain[source].links, target)
     end
-  end
+  end end
 
   return chain
 end
