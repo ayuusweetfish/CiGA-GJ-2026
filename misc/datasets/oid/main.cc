@@ -21,9 +21,15 @@ vector<string> split(const string &s, char delim) {
   return tokens;
 }
 
+string trim_end(const string &s) {
+  size_t end = s.find_last_not_of("\n\r\t\f\v");
+  return s.substr(0, end != std::string::npos ? (end + 1) : 0);
+}
+
 // --------------------------------------
 int main(int argc, char *argv[]) {
   string bbox_file_name;
+  string labeldesc_file_name;
   int n_walks;
 
   if (argc < 2) {
@@ -32,14 +38,17 @@ int main(int argc, char *argv[]) {
   }
 
   bbox_file_name = "oidv6-train-annotations-bbox.csv";
+  labeldesc_file_name = "oidv7-class-descriptions-boxable.csv";
   n_walks = stoi(argv[1]);
 
-  // ---------- 1. Read CSV ----------
+  // ---------- 1. Read annotations ----------
   ifstream file(bbox_file_name);
   if (!file.is_open()) {
     cerr << "Cannot open " << bbox_file_name << endl;
     return 1;
   }
+
+  cout << "Reading bounding box annotations from " << bbox_file_name << endl;
 
   unordered_map<string, int> image_index;
   unordered_map<string, int> label_index;
@@ -92,7 +101,26 @@ int main(int argc, char *argv[]) {
   int V = I + L;
   cout << "Images: " << I << ", Labels: " << L << ", Total vertices: " << V << endl;
 
-  // ---------- 2. Build adjacency lists ----------
+  // ---------- 2. Read class display names ----------
+  unordered_map<string, string> label_display_name;
+  {
+    ifstream labeldesc_file(labeldesc_file_name);
+    if (!labeldesc_file.is_open()) {
+      cerr << "Cannot open " << labeldesc_file_name << endl;
+      return 1;
+    }
+    string line;
+    getline(labeldesc_file, line);  // Skip header
+    while (getline(labeldesc_file, line)) {
+      line = trim_end(line);
+      if (line.empty()) continue;
+      auto cols = split(line, ',');
+      if (cols.size() >= 2)
+        label_display_name[cols[0]] = cols[1];
+    }
+  }
+
+  // ---------- 3. Build adjacency lists ----------
   // Convert sets to vectors for speed
   vector<vector<int>> img_adj_vec(I);
   for (int i = 0; i < I; ++i) {
@@ -136,7 +164,7 @@ int main(int argc, char *argv[]) {
   vector<int> walk_lengths(MAX_WALK_LEN, 0);
   vector<int> checkpoint_longest;
 
-  auto print_stats = [I, &image_ids, &label_names,
+  auto print_stats = [I, &image_ids, &label_names, &label_display_name,
     &walk_lengths, &checkpoint_longest] (int n_walks) -> void
   {
     cout << "Walk length distribution (from " << n_walks << " random walks):\n";
@@ -148,7 +176,7 @@ int main(int argc, char *argv[]) {
     for (int u : checkpoint_longest) {
       cout << " -> ";
       if (u < I) cout << image_ids[u];
-      else cout << label_names[u - I];
+      else cout << label_display_name[label_names[u - I]] << "\n";
     }
     checkpoint_longest.clear();
     cout << endl;

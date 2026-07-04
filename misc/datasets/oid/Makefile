@@ -4,10 +4,17 @@ $(OUT): main.cc
 	mkdir -p $(dir $@)
 	c++ $< -o $@ -O2
 
-run: $(OUT)
+run: $(OUT) dataset
 	$(OUT) 100000
 
 clean:
 	$(RM) -r "$(OUT)"
 
-.PHONY: run clean
+dataset: oidv7-class-descriptions-boxable.csv oidv6-train-annotations-bbox.csv
+
+oidv7-class-descriptions-boxable.csv:
+	curl -o $@ https://storage.googleapis.com/openimages/v7/oidv7-class-descriptions-boxable.csv
+oidv6-train-annotations-bbox.csv:
+	curl -o $@ https://storage.googleapis.com/openimages/v6/oidv6-train-annotations-bbox.csv
+
+.PHONY: run clean dataset
