@@ -192,7 +192,7 @@ return function ()
         since_incorrect = -1
       end
     end
-    if since_reveal >= 0 then
+    if since_reveal >= 0 and (since_incorrect < 0 or since_incorrect > 120) then
       since_reveal = since_reveal + 1
       if since_reveal >= 600 then
         -- Find a new target
@@ -274,7 +274,7 @@ return function ()
     love.graphics.setColor(1, 1, 1)
     draw.img(cur_img, img_cx, img_cy, img_w)
 
-    if since_reveal >= 0 then
+    if since_reveal >= 0 and (since_incorrect < 0 or since_incorrect >= 120) then
       draw.img(prev_img, W - img_cx, img_cy, prev_img_w)
       draw_label(0, unpack(reveal_cur_label))
       for i = 1, #reveal_prev_labels do
