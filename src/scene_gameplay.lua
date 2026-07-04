@@ -52,7 +52,12 @@ return function ()
   local s = {}
   local W, H = W, H
 
-  local img_cx, img_cy = W / 2, H / 2
+  -- Top-left corner size
+  local img_x0, img_y0 = W * 0.5, 29
+  -- Region size
+  local img_rw, img_rh = W * 0.5 - 4, math.floor(H * 0.75)
+
+  local img_cx, img_cy = img_x0 + img_rw / 2, img_y0 + img_rh / 2
 
   local cur_at = 'oid_e70d2d777077e8a3.jpg'
   local cur_img
@@ -61,7 +66,7 @@ return function ()
   local update_img = function ()
     cur_img = draw.loadx('chain/' .. cur_at)
     img_w, img_h = draw.get(cur_img):getDimensions()
-    img_scale = math.min(W * 0.8 / img_w, H * 0.8 / img_h)
+    img_scale = math.min(img_rw / img_w, img_rh / img_h)
   end
   update_img()
 
@@ -89,7 +94,8 @@ return function ()
   s.update = function ()
   end
 
-  local label_font = _G['global_font'](32)
+  local font = _G['global_font'](15)
+  local label_font = _G['global_font'](15)
 
   local draw_label = function (label, x1, y1, x2, y2)
     love.graphics.setColor(1, 0.5, 0.4)
@@ -105,10 +111,37 @@ return function ()
     love.graphics.draw(t, x1, y1 - t:getHeight())
   end
 
+  local window_title
+  local draw_window = function (w, h, cx, cy)
+    draw.img('window', cx, cy, w, h)
+    draw.img('window_logo', cx - w/2 + 4, cy - h/2 + 5, nil, nil, 0, 0)
+    window_title = window_title or love.graphics.newText(font, 'Anchor')
+    love.graphics.setColor(0.71, 0.38, 0.33)
+    draw(window_title, cx - w/2 + 25, cy - h/2 + 20, nil, nil, 0, 1)
+    love.graphics.setColor(0, 0, 0)
+    draw(window_title, cx - w/2 + 26, cy - h/2 + 20, nil, nil, 0, 1)
+  end
+  local draw_lupa = function (x1, y1, x2, y2)
+    love.graphics.setColor(0.52, 0.53, 0.58)
+    love.graphics.rectangle('fill', x1, y1, x2 - x1, 1)
+    love.graphics.rectangle('fill', x2 - 1, y1, 1, y2 - y1)
+    love.graphics.setColor(0.87, 0.89, 0.92)
+    love.graphics.rectangle('fill', x1, y1, 1, y2 - y1)
+    love.graphics.rectangle('fill', x1, y2 - 1, x2 - x1, 1)
+  end
+
   s.draw = function ()
-    love.graphics.clear(0, 0, 0)
+    love.graphics.clear(0, 0, 0.5)
     love.graphics.setColor(1, 1, 1)
-    draw.img(cur_img, W/2, H/2, img_w * img_scale)
+
+    draw_window(W, H, W * 0.5, H * 0.5)
+    draw_lupa(2, 24, W - 2, img_y0 + img_rh + 1 + (img_y0 - 24))
+
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.rectangle('fill', img_x0, img_y0, img_rw, img_rh)
+
+    love.graphics.setColor(1, 1, 1)
+    draw.img(cur_img, img_cx, img_cy, img_w * img_scale)
     for i = 1, #chain[cur_at].labels do
       local label, x1, y1, x2, y2 = unpack(chain[cur_at].labels[i])
       draw_label(label, x1, y1, x2, y2)

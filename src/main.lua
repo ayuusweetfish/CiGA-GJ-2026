@@ -1,14 +1,16 @@
-W = 1280
-H = 720
+W = 640
+H = 360
 
 local isMobile = (love.system.getOS() == 'Android' or love.system.getOS() == 'iOS')
 local isWeb = (love.system.getOS() == 'Web')
 
 love.window.setMode(
-  isWeb and (W / 3 * 2) or W,
-  isWeb and (H / 3 * 2) or H,
-  { fullscreen = false, highdpi = true }
+  isWeb and W * 1 or W * 2,
+  isWeb and H * 1 or H * 2,
+  { fullscreen = false, highdpi = false }
 )
+
+love.graphics.setDefaultFilter('nearest', 'nearest')
 
 local globalScale, Wx, Hx, offsX, offsY
 
@@ -47,8 +49,8 @@ local fontSizeFactory = function (path, preload)
     return font[size]
   end
 end
-_G['global_font'] = fontSizeFactory(nil, {28, 36})
-love.graphics.setFont(_G['global_font'](40))
+_G['global_font'] = fontSizeFactory('fnt/WenQuanYi_Bitmap_Song_14px.ttf', {15, 30})
+love.graphics.setFont(_G['global_font'](15))
 
 _G['scene_loading'] = require 'scene_loading'
 
