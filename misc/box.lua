@@ -1,6 +1,5 @@
 local f = function (W, H, w, h, x, y)
-  return x / W, (x + w) / W,
-         y / H, (y + h) / H
+  return x / W, y / H, (x + w) / W, (y + h) / H
 end
 
 print('Enter: W, H, w, h, x, y')

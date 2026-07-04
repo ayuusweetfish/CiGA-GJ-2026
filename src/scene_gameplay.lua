@@ -100,9 +100,9 @@ return function ()
     y2 = img_cy + img_h * img_scale * (y2 - 0.5)
     love.graphics.rectangle('line', x1, y1, x2 - x1, y2 - y1)
     local t = love.graphics.newText(label_font, label)
-    love.graphics.rectangle('fill', x1, y1, t:getWidth(), t:getHeight())
+    love.graphics.rectangle('fill', x1, y1 - t:getHeight(), t:getWidth(), t:getHeight())
     love.graphics.setColor(1, 1, 1)
-    love.graphics.draw(t, x1, y1)
+    love.graphics.draw(t, x1, y1 - t:getHeight())
   end
 
   s.draw = function ()
