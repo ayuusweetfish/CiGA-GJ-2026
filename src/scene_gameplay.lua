@@ -54,10 +54,10 @@ return function ()
 
   ------------ Chain ------------
 
-  local cur_at = 'a_2848.jpg'
-  local prev_at = 'oid_e70d2d777077e8a3.jpg'
+  local cur_at = 'oid_e70d2d777077e8a3.jpg'
+  local prev_at = 'm_subway.jpg'
   -- Needs a correct label list to handle startup requirement
-  local correct_labels = {['red circular logo'] = true}
+  local correct_labels = {['subway'] = true}
 
   ------------ Image display ------------
 
@@ -183,7 +183,7 @@ return function ()
     return true
   end
 
-  ------------ Update & draw ------------
+  ------------ Update ------------
 
   s.update = function ()
     if since_incorrect >= 0 then
@@ -220,6 +220,8 @@ return function ()
       end
     end
   end
+
+  ------------ Draw ------------
 
   local font = _G['global_font'](15)
   local label_font = _G['global_font'](15)
@@ -261,6 +263,9 @@ return function ()
     love.graphics.rectangle('fill', x1, y2 - 1, x2 - x1, 1)
   end
 
+  local t1 = love.graphics.newText(font, '验证您是人类：')
+  local t2 = love.graphics.newText(font, '请在这张图片中找出上一张图片内\n出现过的同类物体')
+
   s.draw = function ()
     love.graphics.clear(0, 0, 0.5)
     love.graphics.setColor(1, 1, 1)
@@ -275,11 +280,19 @@ return function ()
     draw.img(cur_img, img_cx, img_cy, img_w)
 
     if since_reveal >= 0 and (since_incorrect < 0 or since_incorrect >= 120) then
+      love.graphics.setColor(1, 1, 1, 0.5)
+      love.graphics.rectangle('fill', W - (img_x0 + img_rw), img_y0, img_rw, img_rh)
+      love.graphics.setColor(1, 1, 1)
       draw.img(prev_img, W - img_cx, img_cy, prev_img_w)
       draw_label(0, unpack(reveal_cur_label))
       for i = 1, #reveal_prev_labels do
         draw_label(1, unpack(reveal_prev_labels[i]))
       end
+    else
+      love.graphics.setColor(0, 0, 0)
+      local title_y = 24 + math.floor(H * 0.1)
+      draw(t1, 14, title_y + 0, nil, nil, 0, 0)
+      draw(t2, 14, title_y + 24, nil, nil, 0, 0)
     end
 
     if _G['jam_debug'] then
@@ -292,6 +305,7 @@ return function ()
     if since_incorrect >= 0 then
       local x = img_cx + img_w * (incorrect_x - 0.5)
       local y = img_cy + img_h * (incorrect_y - 0.5)
+      love.graphics.setColor(1, 1, 1)
       draw.img('blossom', x, y, 36)
     end
   end
