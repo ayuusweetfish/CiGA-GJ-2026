@@ -9,7 +9,7 @@
 #define IMAGE_ID_LEN 16
 
 // Function to extract ImageID from a line
-int extract_image_id(const char *line, char *image_id) {
+static int extract_image_id(const char *line, char *image_id) {
   // Skip any leading whitespace
   while (isspace(*line)) line++;
 
@@ -29,7 +29,7 @@ int extract_image_id(const char *line, char *image_id) {
 }
 
 // Get the position of the start of the current line
-long get_line_start(FILE *fp, long pos) {
+static long get_line_start(FILE *fp, long pos) {
   char c;
   long start = pos;
 
@@ -49,7 +49,7 @@ long get_line_start(FILE *fp, long pos) {
 }
 
 // Get the position of the start of the next line
-long get_next_line_start(FILE *fp, long pos) {
+static long get_next_line_start(FILE *fp, long pos) {
   char c;
   long current = pos;
 
@@ -64,7 +64,7 @@ long get_next_line_start(FILE *fp, long pos) {
 }
 
 // Get the first line of the file (header)
-int get_header(FILE *fp, char *header, size_t max_len) {
+static int get_header(FILE *fp, char *header, size_t max_len) {
   rewind(fp);
   if (fgets(header, max_len, fp) == NULL) {
     return 0;
@@ -73,7 +73,7 @@ int get_header(FILE *fp, char *header, size_t max_len) {
 }
 
 // Binary search for the given ImageID
-long binary_search(FILE *fp, const char *target_id, long start_pos, long end_pos) {
+static long binary_search(FILE *fp, const char *target_id, long start_pos, long end_pos) {
   char line[MAX_LINE_LEN];
   char current_id[IMAGE_ID_LEN + 1];
   long mid_pos;
@@ -162,26 +162,18 @@ long binary_search(FILE *fp, const char *target_id, long start_pos, long end_pos
 }
 
 // Function to find end of file position
-long get_file_size(FILE *fp) {
+static long get_file_size(FILE *fp) {
   fseek(fp, 0, SEEK_END);
   long size = ftell(fp);
   fseek(fp, 0, SEEK_SET);
   return size;
 }
 
-// Validate hex string
-int is_valid_hex(const char *str, size_t len) {
-  for (size_t i = 0; i < len; i++) {
-    if (!isxdigit(str[i])) {
-      return 0;
-    }
-  }
-  return 1;
-}
+static const char *find_display_name(const char *label);
 
 int main(int argc, char *argv[]) {
   const char *filename = "oidv6-train-annotations-bbox.csv";
-  char target_id[IMAGE_ID_LEN + 3];
+  char target_id[IMAGE_ID_LEN + 1];
   char header[MAX_LINE_LEN];
   char line[MAX_LINE_LEN];
   FILE *fp;
@@ -208,32 +200,17 @@ int main(int argc, char *argv[]) {
   // Skip header for binary search range
   long data_start = ftell(fp);
 
+  int target_id_ptr = 0;
+
   while (!feof(stdin)) {
-    // Read ImageID from stdin
-    if (fgets(target_id, sizeof(target_id), stdin) == NULL) {
-      if (feof(stdin)) break;
-      fprintf(stderr, "Error reading input\n");
-      return 1;
-    }
+    int c = fgetc(stdin);
+    if (c == EOF) break;
 
-    // Remove newline if present
-    size_t len = strlen(target_id);
-    if (len > 0 && target_id[len - 1] == '\n') {
-      target_id[len - 1] = '\0';
-      len--;
-    }
-    if (len == 0) continue;
-
-    // Validate ImageID format (16 hex chars)
-    if (len != IMAGE_ID_LEN) {
-      fprintf(stderr, "Error: ImageID must be exactly 16 characters (got %zu)\n", len);
-      return 1;
-    }
-
-    if (!is_valid_hex(target_id, IMAGE_ID_LEN)) {
-      fprintf(stderr, "Error: ImageID must be hexadecimal characters only\n");
-      return 1;
-    }
+    if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))
+      target_id[target_id_ptr++] = c;
+    else
+      target_id_ptr = 0;
+    if (target_id_ptr < IMAGE_ID_LEN) continue;
 
     // Binary search for the target ID
     // fprintf(stderr, "Processing %s\n", target_id);
@@ -258,7 +235,24 @@ int main(int argc, char *argv[]) {
       }
 
       if (strcmp(current_id, target_id) == 0) {
-        printf("%s", line);
+        // printf("%s", line);
+
+        char *s = line;
+        for (int i = 0; i < 2; i++) {
+          if ((s = strchr(s, ',')) == NULL) break; s++;
+        }
+        if (s == NULL || *s == '\0') break;
+        char *label_name = s;
+        if ((s = strchr(s, ',')) == NULL) break; s++;
+        s[-1] = '\0';
+        if ((s = strchr(s, ',')) == NULL) break; s++;
+        char *bbox_start = s;
+        for (int i = 0; i < 4; i++) {
+          if ((s = strchr(s, ',')) == NULL) break; s++;
+        }
+        s[-1] = '\0';
+        printf("%s,%s,%s\n", current_id, bbox_start, find_display_name(label_name));
+
       } else {
         break; // Since file is sorted by ImageID, we can stop
       }
@@ -267,4 +261,615 @@ int main(int argc, char *argv[]) {
 
   fclose(fp);
   return 0;
+}
+
+static const char *find_display_name(const char *label) {
+  static const char *display_name_map[][2] = {
+    {"/m/011k07", "Tortoise"},
+    {"/m/011q46kg", "Container"},
+    {"/m/012074", "Magpie"},
+    {"/m/0120dh", "Sea turtle"},
+    {"/m/01226z", "Football"},
+    {"/m/012n7d", "Ambulance"},
+    {"/m/012w5l", "Ladder"},
+    {"/m/012xff", "Toothbrush"},
+    {"/m/012ysf", "Syringe"},
+    {"/m/0130jx", "Sink"},
+    {"/m/0138tl", "Toy"},
+    {"/m/013y1f", "Organ (Musical Instrument)"},
+    {"/m/01432t", "Cassette deck"},
+    {"/m/014j1m", "Apple"},
+    {"/m/014sv8", "Human eye"},
+    {"/m/014trl", "Cosmetics"},
+    {"/m/014y4n", "Paddle"},
+    {"/m/0152hh", "Snowman"},
+    {"/m/01599", "Beer"},
+    {"/m/015h_t", "Beard"},
+    {"/m/015p6", "Bird"},
+    {"/m/015qbp", "Parking meter"},
+    {"/m/015qff", "Traffic light"},
+    {"/m/015wgc", "Croissant"},
+    {"/m/015x4r", "Cucumber"},
+    {"/m/015x5n", "Radish"},
+    {"/m/0162_1", "Towel"},
+    {"/m/0167gd", "Doll"},
+    {"/m/016m2d", "Skull"},
+    {"/m/0174k2", "Washing machine"},
+    {"/m/0174n1", "Glove"},
+    {"/m/0175cv", "Tick"},
+    {"/m/0176mf", "Belt"},
+    {"/m/017ftj", "Sunglasses"},
+    {"/m/018j2", "Banjo"},
+    {"/m/018p4k", "Cart"},
+    {"/m/018xm", "Ball (Object)"},
+    {"/m/01940j", "Backpack"},
+    {"/m/0199g", "Bicycle"},
+    {"/m/019dx1", "Home appliance"},
+    {"/m/019h78", "Centipede"},
+    {"/m/019jd", "Boat"},
+    {"/m/019w40", "Surfboard"},
+    {"/m/01_5g", "Chopsticks"},
+    {"/m/01_bhs", "Fast food"},
+    {"/m/01b638", "Boot"},
+    {"/m/01b7fy", "Headphones"},
+    {"/m/01b9xk", "Hot dog"},
+    {"/m/01bfm9", "Shorts"},
+    {"/m/01bjv", "Bus"},
+    {"/m/01bl7v", "Boy"},
+    {"/m/01bms0", "Screwdriver"},
+    {"/m/01bqk0", "Bicycle wheel"},
+    {"/m/01btn", "Barge"},
+    {"/m/01c648", "Laptop"},
+    {"/m/01cmb2", "Miniskirt"},
+    {"/m/01d380", "Drill (Tool)"},
+    {"/m/01d40f", "Dress"},
+    {"/m/01dws", "Bear"},
+    {"/m/01dwsz", "Waffle"},
+    {"/m/01dwwc", "Pancake"},
+    {"/m/01dxs", "Brown bear"},
+    {"/m/01dy8n", "Woodpecker"},
+    {"/m/01f8m5", "Blue jay"},
+    {"/m/01f91_", "Pretzel"},
+    {"/m/01fb_0", "Bagel"},
+    {"/m/01fdzj", "Tower"},
+    {"/m/01fh4r", "Teapot"},
+    {"/m/01g317", "Person"},
+    {"/m/01g3x7", "Bow and arrow"},
+    {"/m/01gkx_", "Swimwear"},
+    {"/m/01gllr", "Beehive"},
+    {"/m/01gmv2", "Brassiere"},
+    {"/m/01h3n", "Bee"},
+    {"/m/01h44", "Bat (Animal)"},
+    {"/m/01h8tj", "Starfish"},
+    {"/m/01hrv5", "Popcorn"},
+    {"/m/01j3zr", "Burrito"},
+    {"/m/01j4z9", "Chainsaw"},
+    {"/m/01j51", "Balloon"},
+    {"/m/01j5ks", "Wrench"},
+    {"/m/01j61q", "Tent"},
+    {"/m/01jfm_", "Vehicle registration plate"},
+    {"/m/01jfsr", "Lantern"},
+    {"/m/01k6s3", "Toaster"},
+    {"/m/01kb5b", "Flashlight"},
+    {"/m/01knjb", "Billboard"},
+    {"/m/01krhy", "Tiara"},
+    {"/m/01lcw4", "Limousine"},
+    {"/m/01llwg", "Necklace"},
+    {"/m/01lrl", "Carnivore"},
+    {"/m/01lsmm", "Scissors"},
+    {"/m/01lynh", "Stairs"},
+    {"/m/01m2v", "Computer keyboard"},
+    {"/m/01m4t", "Printer"},
+    {"/m/01mqdt", "Traffic sign"},
+    {"/m/01mzpv", "Chair"},
+    {"/m/01n4qj", "Shirt"},
+    {"/m/01n5jq", "Poster"},
+    {"/m/01nkt", "Cheese"},
+    {"/m/01nq26", "Sock"},
+    {"/m/01pns0", "Fire hydrant"},
+    {"/m/01prls", "Land vehicle"},
+    {"/m/01r546", "Earring"},
+    {"/m/01rkbr", "Tie"},
+    {"/m/01rzcn", "Watercraft"},
+    {"/m/01s105", "Cabinetry"},
+    {"/m/01s55n", "Suitcase"},
+    {"/m/01tcjp", "Muffin"},
+    {"/m/01vbnl", "Bidet"},
+    {"/m/01ww8y", "Snack"},
+    {"/m/01x3jk", "Snowmobile"},
+    {"/m/01x3z", "Clock"},
+    {"/m/01x_v", "Camel"},
+    {"/m/01xgg_", "Medical equipment"},
+    {"/m/01xq0k1", "Cattle"},
+    {"/m/01xqw", "Cello"},
+    {"/m/01xs3r", "Jet ski"},
+    {"/m/01xygc", "Coat"},
+    {"/m/01xyhv", "Suit"},
+    {"/m/01y9k5", "Desk"},
+    {"/m/01yrx", "Cat"},
+    {"/m/01yx86", "Bronze sculpture"},
+    {"/m/01z1kdw", "Juice"},
+    {"/m/02068x", "Gondola"},
+    {"/m/020jm", "Beetle"},
+    {"/m/020kz", "Cannon"},
+    {"/m/020lf", "Computer mouse"},
+    {"/m/021mn", "Cookie"},
+    {"/m/021sj1", "Office building"},
+    {"/m/0220r2", "Fountain"},
+    {"/m/0242l", "Coin"},
+    {"/m/024d2", "Calculator"},
+    {"/m/024g6", "Cocktail"},
+    {"/m/02522", "Computer monitor"},
+    {"/m/025dyy", "Box"},
+    {"/m/025fsf", "Stapler"},
+    {"/m/025nd", "Christmas tree"},
+    {"/m/025rp__", "Cowboy hat"},
+    {"/m/0268lbt", "Hiking equipment"},
+    {"/m/026qbn5", "Studio couch"},
+    {"/m/026t6", "Drum"},
+    {"/m/0270h", "Dessert"},
+    {"/m/0271qf7", "Wine rack"},
+    {"/m/0271t", "Drink"},
+    {"/m/027pcv", "Zucchini"},
+    {"/m/027rl48", "Ladle"},
+    {"/m/0283dt1", "Human mouth"},
+    {"/m/0284d", "Dairy Product"},
+    {"/m/029b3", "Dice"},
+    {"/m/029bxz", "Oven"},
+    {"/m/029tx", "Dinosaur"},
+    {"/m/02_n6y", "Goggles"},
+    {"/m/02bm9n", "Ratchet (Device)"},
+    {"/m/02crq1", "Couch"},
+    {"/m/02ctlc", "Cricket ball"},
+    {"/m/02cvgx", "Winter melon"},
+    {"/m/02d1br", "Spatula"},
+    {"/m/02d9qx", "Whiteboard"},
+    {"/m/02ddwp", "Pencil sharpener"},
+    {"/m/02dgv", "Door"},
+    {"/m/02dl1y", "Hat"},
+    {"/m/02f9f_", "Shower"},
+    {"/m/02fh7f", "Eraser"},
+    {"/m/02fq_6", "Fedora"},
+    {"/m/02g30s", "Guacamole"},
+    {"/m/02gzp", "Dagger"},
+    {"/m/02h19r", "Scarf"},
+    {"/m/02hj4", "Dolphin"},
+    {"/m/02jfl0", "Sombrero"},
+    {"/m/02jnhm", "Tin can"},
+    {"/m/02jvh9", "Mug"},
+    {"/m/02jz0l", "Tap"},
+    {"/m/02l8p9", "Harbor seal"},
+    {"/m/02lbcq", "Stretcher"},
+    {"/m/02mqfb", "Can opener"},
+    {"/m/02p0tk3", "Human body"},
+    {"/m/02p3w7d", "Roller skates"},
+    {"/m/02p5f1q", "Coffee cup"},
+    {"/m/02pdsw", "Cutting board"},
+    {"/m/02pjr4", "Blender"},
+    {"/m/02pkr5", "Plumbing fixture"},
+    {"/m/02pv19", "Stop sign"},
+    {"/m/02rdsp", "Office supplies"},
+    {"/m/02rgn06", "Volleyball (Ball)"},
+    {"/m/02s195", "Vase"},
+    {"/m/02tsc9", "Slow cooker"},
+    {"/m/02vkqh8", "Wardrobe"},
+    {"/m/02vqfm", "Coffee (drink)"},
+    {"/m/02vwcm", "Whisk"},
+    {"/m/02w3_ws", "Personal care"},
+    {"/m/02w3r3", "Paper towel"},
+    {"/m/02wbm", "Food"},
+    {"/m/02wbtzl", "Sun hat"},
+    {"/m/02wg_p", "Tree house"},
+    {"/m/02wmf", "Flying disc"},
+    {"/m/02wv6h6", "Skirt"},
+    {"/m/02wv84t", "Gas stove"},
+    {"/m/02x8cch", "Salt and pepper shakers"},
+    {"/m/02x984l", "Mechanical fan"},
+    {"/m/02xb7qb", "Face powder"},
+    {"/m/02xqq", "Fax"},
+    {"/m/02xwb", "Fruit"},
+    {"/m/02y6n", "French fries"},
+    {"/m/02z51p", "Nightstand"},
+    {"/m/02zn6n", "Barrel"},
+    {"/m/02zt3", "Kite"},
+    {"/m/02zvsm", "Tart"},
+    {"/m/030610", "Treadmill"},
+    {"/m/0306r", "Fox"},
+    {"/m/03120", "Flag"},
+    {"/m/0319l", "French horn"},
+    {"/m/031b6r", "Window blind"},
+    {"/m/031n1", "Human foot"},
+    {"/m/0323sq", "Golf cart"},
+    {"/m/032b3c", "Jacket"},
+    {"/m/033cnk", "Egg"},
+    {"/m/033rq4", "Street light"},
+    {"/m/0342h", "Guitar"},
+    {"/m/034c16", "Pillow"},
+    {"/m/035r7c", "Human leg"},
+    {"/m/035vxb", "Isopod"},
+    {"/m/0388q", "Grape"},
+    {"/m/039xj_", "Human ear"},
+    {"/m/03__z0", "Bookcase"},
+    {"/m/03_wxk", "Kitchenware"},
+    {"/m/03bbps", "Power plugs and sockets"},
+    {"/m/03bj1", "Panda"},
+    {"/m/03bk1", "Giraffe"},
+    {"/m/03bt1vf", "Woman"},
+    {"/m/03c7gz", "Door handle"},
+    {"/m/03d443", "Rhinoceros"},
+    {"/m/03dnzn", "Bathtub"},
+    {"/m/03fj2", "Goldfish"},
+    {"/m/03fp41", "Houseplant"},
+    {"/m/03fwl", "Goat"},
+    {"/m/03g8mr", "Baseball bat"},
+    {"/m/03grzl", "Baseball glove"},
+    {"/m/03hj559", "Mixing bowl"},
+    {"/m/03hl4l9", "Marine invertebrates"},
+    {"/m/03hlz0c", "Kitchen utensil"},
+    {"/m/03jbxj", "Light switch"},
+    {"/m/03jm5", "House"},
+    {"/m/03k3r", "Horse"},
+    {"/m/03kt2w", "Stationary bicycle"},
+    {"/m/03l9g", "Hammer"},
+    {"/m/03ldnb", "Ceiling fan"},
+    {"/m/03m3pdh", "Sofa bed"},
+    {"/m/03m3vtv", "Adhesive tape"},
+    {"/m/03m5k", "Harp"},
+    {"/m/03nfch", "Sandal"},
+    {"/m/03p3bw", "Bicycle helmet"},
+    {"/m/03q5c7", "Saucer"},
+    {"/m/03q5t", "Harpsichord"},
+    {"/m/03q69", "Human hair"},
+    {"/m/03qhv5", "Heater"},
+    {"/m/03qjg", "Harmonica"},
+    {"/m/03qrc", "Hamster"},
+    {"/m/03rszm", "Curtain"},
+    {"/m/03s_tn", "Kettle"},
+    {"/m/03ssj5", "Bed"},
+    {"/m/03tw93", "Fireplace"},
+    {"/m/03txqz", "Scale"},
+    {"/m/03v5tg", "Drinking straw"},
+    {"/m/03vt0", "Insect"},
+    {"/m/03wvsk", "Hair dryer"},
+    {"/m/03wym", "Indoor rower"},
+    {"/m/03xxp", "Invertebrate"},
+    {"/m/03y6mg", "Food processor"},
+    {"/m/040b_t", "Refrigerator"},
+    {"/m/04169hn", "Wood-burning stove"},
+    {"/m/0420v5", "Punching bag"},
+    {"/m/043nyj", "Common fig"},
+    {"/m/0440zs", "Cocktail shaker"},
+    {"/m/0449p", "Jaguar (Animal)"},
+    {"/m/044r5d", "Golf ball"},
+    {"/m/0463sg", "Fashion accessory"},
+    {"/m/046dlr", "Alarm clock"},
+    {"/m/047j0r", "Filing cabinet"},
+    {"/m/047v4b", "Artichoke"},
+    {"/m/04_sv", "Motorcycle"},
+    {"/m/04bcr3", "Table"},
+    {"/m/04brg2", "Tableware"},
+    {"/m/04c0y", "Kangaroo"},
+    {"/m/04cp_", "Koala"},
+    {"/m/04ctx", "Knife"},
+    {"/m/04dr76w", "Bottle"},
+    {"/m/04f5ws", "Bottle opener"},
+    {"/m/04g2r", "Lynx"},
+    {"/m/04gth", "Lavender (Plant)"},
+    {"/m/04h7h", "Lighthouse"},
+    {"/m/04h8sr", "Dumbbell"},
+    {"/m/04hgtk", "Human head"},
+    {"/m/04kkgm", "Bowl"},
+    {"/m/04lvq_", "Humidifier"},
+    {"/m/04m6gz", "Porch"},
+    {"/m/04m9y", "Lizard"},
+    {"/m/04p0qw", "Billiard table"},
+    {"/m/04rky", "Mammal"},
+    {"/m/04rmv", "Mouse"},
+    {"/m/04szw", "Musical instrument"},
+    {"/m/04tn4x", "Swim cap"},
+    {"/m/04v6l4", "Frying pan"},
+    {"/m/04vv5k", "Snowplow"},
+    {"/m/04y4h8h", "Bathroom cabinet"},
+    {"/m/04ylt", "Missile"},
+    {"/m/04yqq2", "Bust"},
+    {"/m/04yx4", "Man"},
+    {"/m/04z4wx", "Waffle iron"},
+    {"/m/04zpv", "Milk"},
+    {"/m/04zwwv", "Ring binder"},
+    {"/m/050gv4", "Plate"},
+    {"/m/050k8", "Mobile phone"},
+    {"/m/052lwg6", "Baked goods"},
+    {"/m/052sf", "Mushroom"},
+    {"/m/05441v", "Crutch"},
+    {"/m/054_l", "Mirror"},
+    {"/m/054fyh", "Pitcher (Container)"},
+    {"/m/054xkw", "Personal flotation device"},
+    {"/m/05676x", "Pencil case"},
+    {"/m/057cc", "Musical keyboard"},
+    {"/m/057p5t", "Scoreboard"},
+    {"/m/0584n8", "Briefcase"},
+    {"/m/058qzx", "Kitchen knife"},
+    {"/m/05_5p_0", "Table tennis racket"},
+    {"/m/05bm6", "Nail (Construction)"},
+    {"/m/05ctyq", "Tennis ball"},
+    {"/m/05gqfk", "Plastic bag"},
+    {"/m/05kms", "Oboe"},
+    {"/m/05kyg_", "Chest of drawers"},
+    {"/m/05n4y", "Ostrich"},
+    {"/m/05r5c", "Piano"},
+    {"/m/05r655", "Girl"},
+    {"/m/05s2s", "Plant"},
+    {"/m/05vtc", "Potato"},
+    {"/m/05w9t9", "Hair spray"},
+    {"/m/05y5lj", "Sports equipment"},
+    {"/m/05z55", "Pasta"},
+    {"/m/05z6w", "Penguin"},
+    {"/m/05zsy", "Pumpkin"},
+    {"/m/061_f", "Pear"},
+    {"/m/061hd_", "Infant bed"},
+    {"/m/0633h", "Polar bear"},
+    {"/m/063rgb", "Mixer"},
+    {"/m/0642b4", "Cupboard"},
+    {"/m/065h6l", "Jacuzzi"},
+    {"/m/0663v", "Pizza"},
+    {"/m/068zj", "Pig"},
+    {"/m/06_72j", "Digital clock"},
+    {"/m/06__v", "Snowboard"},
+    {"/m/06_fw", "Skateboard"},
+    {"/m/06bt6", "Reptile"},
+    {"/m/06c54", "Rifle"},
+    {"/m/06c7f7", "Lipstick"},
+    {"/m/06j2d", "Raven"},
+    {"/m/06k2mb", "High heels"},
+    {"/m/06l9r", "Red panda"},
+    {"/m/06m11", "Rose"},
+    {"/m/06mf6", "Rabbit"},
+    {"/m/06msq", "Sculpture"},
+    {"/m/06ncr", "Saxophone"},
+    {"/m/06nrc", "Shotgun"},
+    {"/m/06nwz", "Seafood"},
+    {"/m/06pcq", "Submarine sandwich"},
+    {"/m/06y5r", "Sword"},
+    {"/m/06z37_", "Picture frame"},
+    {"/m/07030", "Sushi"},
+    {"/m/0703r8", "Loveseat"},
+    {"/m/071p9", "Ski"},
+    {"/m/071qp", "Squirrel"},
+    {"/m/073bxn", "Tripod"},
+    {"/m/073g6", "Stethoscope"},
+    {"/m/074d1", "Submarine"},
+    {"/m/0755b", "Scorpion"},
+    {"/m/076bq", "Segway"},
+    {"/m/076lb9", "Training bench"},
+    {"/m/078jl", "Snake"},
+    {"/m/078n6m", "Coffee table"},
+    {"/m/079cl", "Skyscraper"},
+    {"/m/07bgp", "Sheep"},
+    {"/m/07c52", "Television"},
+    {"/m/07c6l", "Trombone"},
+    {"/m/07clx", "Tea"},
+    {"/m/07cmd", "Tank"},
+    {"/m/07crc", "Taco"},
+    {"/m/07cx4", "Telephone"},
+    {"/m/07dd4", "Torch"},
+    {"/m/07dm6", "Tiger"},
+    {"/m/07fbm7", "Strawberry"},
+    {"/m/07gql", "Trumpet"},
+    {"/m/07j7r", "Tree"},
+    {"/m/07j87", "Tomato"},
+    {"/m/07jdr", "Train"},
+    {"/m/07k1x", "Tool"},
+    {"/m/07kng9", "Picnic basket"},
+    {"/m/07mcwg", "Cooking spray"},
+    {"/m/07mhn", "Trousers"},
+    {"/m/07pj7bq", "Bowling equipment"},
+    {"/m/07qxg_", "Football helmet"},
+    {"/m/07r04", "Truck"},
+    {"/m/07v9_z", "Measuring cup"},
+    {"/m/07xyvk", "Coffeemaker"},
+    {"/m/07y_7", "Violin"},
+    {"/m/07yv9", "Vehicle"},
+    {"/m/080hkjn", "Handbag"},
+    {"/m/080n7g", "Paper cutter"},
+    {"/m/081qc", "Wine"},
+    {"/m/083kb", "Weapon"},
+    {"/m/083wq", "Wheel"},
+    {"/m/084hf", "Worm"},
+    {"/m/084rd", "Wok"},
+    {"/m/084zz", "Whale"},
+    {"/m/0898b", "Zebra"},
+    {"/m/08dz3q", "Auto part"},
+    {"/m/08hvt4", "Jug"},
+    {"/m/08ks85", "Pizza cutter"},
+    {"/m/08p92x", "Cream"},
+    {"/m/08pbxl", "Monkey"},
+    {"/m/096mb", "Lion"},
+    {"/m/09728", "Bread"},
+    {"/m/099ssp", "Platter"},
+    {"/m/09b5t", "Chicken"},
+    {"/m/09csl", "Eagle"},
+    {"/m/09ct_", "Helicopter"},
+    {"/m/09d5_", "Owl"},
+    {"/m/09ddx", "Duck"},
+    {"/m/09dzg", "Turtle"},
+    {"/m/09f20", "Hippopotamus"},
+    {"/m/09f_2", "Crocodile"},
+    {"/m/09g1w", "Toilet"},
+    {"/m/09gtd", "Toilet paper"},
+    {"/m/09gys", "Squid"},
+    {"/m/09j2d", "Clothing"},
+    {"/m/09j5n", "Footwear"},
+    {"/m/09k_b", "Lemon (plant)"},
+    {"/m/09kmb", "Spider"},
+    {"/m/09kx5", "Deer"},
+    {"/m/09ld4", "Frog"},
+    {"/m/09qck", "Banana"},
+    {"/m/09rvcxw", "Rocket"},
+    {"/m/09tvcd", "Wine glass"},
+    {"/m/0_cp5", "Oyster"},
+    {"/m/0_dqb", "Chisel"},
+    {"/m/0_k2", "Ant"},
+    {"/m/0b3fp9", "Countertop"},
+    {"/m/0b_rs", "Swimming pool"},
+    {"/m/0bh9flk", "Tablet computer"},
+    {"/m/0bjyj5", "Waste container"},
+    {"/m/0bt9lr", "Dog"},
+    {"/m/0bt_c3", "Book"},
+    {"/m/0bwd_0j", "Elephant"},
+    {"/m/0by6g", "Shark"},
+    {"/m/0c06p", "Candle"},
+    {"/m/0c29q", "Leopard"},
+    {"/m/0c2jj", "Axe"},
+    {"/m/0c3m8g", "Hand dryer"},
+    {"/m/0c3mkw", "Soap dispenser"},
+    {"/m/0c568", "Porcupine"},
+    {"/m/0c9ph5", "Flower"},
+    {"/m/0c_jw", "Furniture"},
+    {"/m/0ccs93", "Canary"},
+    {"/m/0cd4d", "Cheetah"},
+    {"/m/0cdl1", "Palm tree"},
+    {"/m/0cdn1", "Hamburger"},
+    {"/m/0cffdh", "Maple"},
+    {"/m/0cgh4", "Building"},
+    {"/m/0ch_cf", "Fish"},
+    {"/m/0cjq5", "Lobster"},
+    {"/m/0cjs7", "Garden Asparagus"},
+    {"/m/0cl4p", "Hedgehog"},
+    {"/m/0cmf2", "Fixed-wing aircraft"},
+    {"/m/0cmx8", "Spoon"},
+    {"/m/0cn6p", "Otter"},
+    {"/m/0cnyhnx", "Bull"},
+    {"/m/0cqn2", "Horizontal bar"},
+    {"/m/0crjs", "Convenience store"},
+    {"/m/0ct4f", "Bomb"},
+    {"/m/0cvnqh", "Bench"},
+    {"/m/0cxn2", "Ice cream"},
+    {"/m/0cydv", "Caterpillar"},
+    {"/m/0cyf8", "Butterfly"},
+    {"/m/0cyfs", "Parachute"},
+    {"/m/0cyhj_", "Orange (fruit)"},
+    {"/m/0czz2", "Antelope"},
+    {"/m/0d20w4", "Beaker"},
+    {"/m/0d4v4", "Window"},
+    {"/m/0d4w1", "Closet"},
+    {"/m/0d5gx", "Castle"},
+    {"/m/0d8zb", "Jellyfish"},
+    {"/m/0d_2m", "Moths and butterflies"},
+    {"/m/0dbvp", "Goose"},
+    {"/m/0dbzx", "Mule"},
+    {"/m/0dftk", "Swan"},
+    {"/m/0dj6p", "Peach"},
+    {"/m/0djtd", "Coconut"},
+    {"/m/0dkzw", "Seat belt"},
+    {"/m/0dq75", "Raccoon"},
+    {"/m/0dt3t", "Fork"},
+    {"/m/0dtln", "Lamp"},
+    {"/m/0dv5r", "Camera"},
+    {"/m/0dv77", "Squash (Plant)"},
+    {"/m/0dv9c", "Racket"},
+    {"/m/0dzct", "Human face"},
+    {"/m/0dzf4", "Human arm"},
+    {"/m/0f4s2w", "Vegetable"},
+    {"/m/0f571", "Diaper"},
+    {"/m/0f6nr", "Unicycle"},
+    {"/m/0f6wt", "Falcon"},
+    {"/m/0f8s22", "Chime"},
+    {"/m/0f9_l", "Snail"},
+    {"/m/0fbdv", "Shellfish"},
+    {"/m/0fbw6", "Cabbage"},
+    {"/m/0fj52s", "Carrot"},
+    {"/m/0fldg", "Mango"},
+    {"/m/0fly7", "Jeans"},
+    {"/m/0fm3zh", "Flowerpot"},
+    {"/m/0fp6w", "Pineapple"},
+    {"/m/0fqfqc", "Drawer"},
+    {"/m/0fqt361", "Stool"},
+    {"/m/0frqm", "Envelope"},
+    {"/m/0fszt", "Cake"},
+    {"/m/0ft9s", "Dragonfly"},
+    {"/m/0ftb8", "Common sunflower"},
+    {"/m/0fx9l", "Microwave oven"},
+    {"/m/0fz0h", "Honeycomb"},
+    {"/m/0gd2v", "Marine mammal"},
+    {"/m/0gd36", "Sea lion"},
+    {"/m/0gj37", "Ladybug"},
+    {"/m/0gjbg72", "Shelf"},
+    {"/m/0gjkl", "Watch"},
+    {"/m/0gm28", "Candy"},
+    {"/m/0grw1", "Salad"},
+    {"/m/0gv1x", "Parrot"},
+    {"/m/0gxl3", "Handgun"},
+    {"/m/0h23m", "Sparrow"},
+    {"/m/0h2r6", "Van"},
+    {"/m/0h8jyh6", "Grinder"},
+    {"/m/0h8kx63", "Spice rack"},
+    {"/m/0h8l4fh", "Light bulb"},
+    {"/m/0h8lkj8", "Corded phone"},
+    {"/m/0h8mhzd", "Sports uniform"},
+    {"/m/0h8my_4", "Tennis racket"},
+    {"/m/0h8mzrc", "Wall clock"},
+    {"/m/0h8n27j", "Serving tray"},
+    {"/m/0h8n5zk", "Kitchen & dining room table"},
+    {"/m/0h8n6f9", "Dog bed"},
+    {"/m/0h8n6ft", "Cake stand"},
+    {"/m/0h8nm9j", "Cat furniture"},
+    {"/m/0h8nr_l", "Bathroom accessory"},
+    {"/m/0h8nsvg", "Facial tissue holder"},
+    {"/m/0h8ntjv", "Pressure cooker"},
+    {"/m/0h99cwc", "Kitchen appliance"},
+    {"/m/0h9mv", "Tire"},
+    {"/m/0hdln", "Ruler"},
+    {"/m/0hf58v5", "Luggage and bags"},
+    {"/m/0hg7b", "Microphone"},
+    {"/m/0hkxq", "Broccoli"},
+    {"/m/0hnnb", "Umbrella"},
+    {"/m/0hnyx", "Pastry"},
+    {"/m/0hqkz", "Grapefruit"},
+    {"/m/0j496", "Band-aid"},
+    {"/m/0jbk", "Animal"},
+    {"/m/0jg57", "Bell pepper"},
+    {"/m/0jly1", "Turkey"},
+    {"/m/0jqgx", "Lily"},
+    {"/m/0jwn_", "Pomegranate"},
+    {"/m/0jy4k", "Doughnut"},
+    {"/m/0jyfg", "Glasses"},
+    {"/m/0k0pj", "Human nose"},
+    {"/m/0k1tl", "Pen"},
+    {"/m/0k4j", "Car"},
+    {"/m/0k5j", "Aircraft"},
+    {"/m/0k65p", "Human hand"},
+    {"/m/0km7z", "Skunk"},
+    {"/m/0kmg4", "Teddy bear"},
+    {"/m/0kpqd", "Watermelon"},
+    {"/m/0kpt_", "Cantaloupe"},
+    {"/m/0ky7b", "Dishwasher"},
+    {"/m/0l14j_", "Flute"},
+    {"/m/0l3ms", "Balance beam"},
+    {"/m/0l515", "Sandwich"},
+    {"/m/0ll1f78", "Shrimp"},
+    {"/m/0llzx", "Sewing machine"},
+    {"/m/0lt4_", "Binoculars"},
+    {"/m/0m53l", "Rays and skates"},
+    {"/m/0mcx2", "Ipod"},
+    {"/m/0mkg", "Accordion"},
+    {"/m/0mw_6", "Willow"},
+    {"/m/0n28_", "Crab"},
+    {"/m/0nl46", "Crown"},
+    {"/m/0nybt", "Seahorse"},
+    {"/m/0p833", "Perfume"},
+    {"/m/0pcr", "Alpaca"},
+    {"/m/0pg52", "Taxi"},
+    {"/m/0ph39", "Canoe"},
+    {"/m/0qjjc", "Remote control"},
+    {"/m/0qmmr", "Wheelchair"},
+    {"/m/0wdt60w", "Rugby ball"},
+    {"/m/0xfy", "Armadillo"},
+    {"/m/0xzly", "Maraca"},
+    {"/m/0zvk5", "Helmet"},
+  };
+  const int N = sizeof display_name_map / sizeof display_name_map[0];
+  for (int i = 0; i < N; i++)
+    if (strcmp(display_name_map[i][0], label) == 0)
+      return display_name_map[i][1];
+  return "-";
 }
