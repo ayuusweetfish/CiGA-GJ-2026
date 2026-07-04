@@ -52,6 +52,15 @@ return function ()
   local s = {}
   local W, H = W, H
 
+  ------------ Chain ------------
+
+  local cur_at = 'a_2848.jpg'
+  local prev_at = 'oid_e70d2d777077e8a3.jpg'
+  -- Needs a correct label list to handle startup requirement
+  local correct_labels = {['red circular logo'] = true}
+
+  ------------ Image display ------------
+
   -- Top-left corner size
   local img_x0, img_y0 = W * 0.5, 29
   -- Region size
@@ -59,18 +68,52 @@ return function ()
 
   local img_cx, img_cy = img_x0 + img_rw / 2, img_y0 + img_rh / 2
 
-  local cur_at = 'oid_e70d2d777077e8a3.jpg'
-  local cur_img
-  local img_w, img_h, img_scale
+  local cur_img, img_w, img_h
+  local prev_img, prev_img_w, prev_img_h
 
-  local update_img = function ()
-    cur_img = draw.loadx('chain/' .. cur_at)
+  local push_cur_img = function (node_name)
+    if prev_img ~= nil then
+      draw.unload(prev_img)
+    end
+    prev_img = cur_img
+    prev_img_w = img_w
+    prev_img_h = img_h
+
+    cur_img = draw.loadx('chain/' .. node_name)
     img_w, img_h = draw.get(cur_img):getDimensions()
-    img_scale = math.min(img_rw / img_w, img_rh / img_h)
+    local scale = math.min(img_rw / img_w, img_rh / img_h)
+    img_w = img_w * scale
+    img_h = img_h * scale
   end
-  update_img()
+  push_cur_img(prev_at)
+  push_cur_img(cur_at)
+
+  ------------ State ------------
+
+  local since_reveal = -1
+  local reveal_cur_label = nil
+  local reveal_prev_labels = nil
+
+  local since_incorrect = -1
+
+  ------------ Pointer events ------------
+
+  local pt_on_img = function (x, y)
+    x = 0.5 + (x - img_cx) / img_w
+    y = 0.5 + (y - img_cy) / img_h
+    if x < 0 or x > 1 or y < 0 or y > 1 then
+      return nil, nil
+    else
+      return x, y
+    end
+  end
+
+  local is_press_started_on_img = false
 
   s.press = function (x, y)
+    if since_reveal >= 0 or since_incorrect >= 0 then return true end
+    is_press_started_on_img = (pt_on_img(x, y) ~= nil)
+    return is_press_started_on_img
   end
 
   s.hover = function (x, y)
@@ -80,30 +123,93 @@ return function ()
   end
 
   s.release = function (x, y)
-    -- Find a new target
-    local out_links = chain[cur_at].links
-    if #out_links == 0 then
-      return  -- XXX: This should not happen! Debug use only
+    if not is_press_started_on_img then return end
+    x, y = pt_on_img(x, y)
+    if not x then return end
+
+    -- Check whether matches a label region
+    local correct = false
+    for i = 1, #chain[cur_at].labels do
+      local label_text, x1, y1, x2, y2 = unpack(chain[cur_at].labels[i])
+      if x >= x1 and x <= x2 and y >= y1 and y <= y2 then
+        -- Is correct?
+        if correct_labels[label_text] then
+          -- Yes!
+          reveal_cur_label = chain[cur_at].labels[i]
+          reveal_prev_labels = {}
+          for j = 1, #chain[prev_at].labels do
+            local l = chain[prev_at].labels[j]
+            if l[1] == label_text then
+              reveal_prev_labels[#reveal_prev_labels + 1] = l
+            end
+          end
+          since_reveal = 0
+          correct = true
+          break
+        end
+      end
     end
-    local go_to = out_links[love.math.random(#out_links)]
-    draw.unload(cur_img)
-    cur_at = go_to
-    update_img()
+
+    if not correct then
+      print('Incorrect')
+      since_incorrect = 0
+    end
+
+    is_press_started_on_img = false
+    return true
   end
 
+  ------------ Update & draw ------------
+
   s.update = function ()
+    if since_incorrect >= 0 then
+      since_incorrect = since_incorrect + 1
+      if since_incorrect >= 240 then
+        since_incorrect = -1
+      end
+    end
+    if since_reveal >= 0 then
+      since_reveal = since_reveal + 1
+      if since_reveal >= 600 then
+        -- Find a new target
+        local out_links = chain[cur_at].links
+        if #out_links == 0 then
+          return  -- XXX: This should not happen! Debug use only
+        end
+        local go_to = out_links[love.math.random(#out_links)]
+        correct_labels = {}
+        local cur_labels = {}
+        for i = 1, #chain[cur_at].labels do
+          local label_name = chain[cur_at].labels[i][1]
+          cur_labels[label_name] = true
+        end
+        for i = 1, #chain[go_to].labels do
+          local label_name = chain[go_to].labels[i][1]
+          if cur_labels[label_name] then
+            correct_labels[label_name] = true
+          end
+        end
+        prev_at, cur_at = cur_at, go_to
+        push_cur_img(cur_at)
+        since_reveal = -1
+      end
+    end
   end
 
   local font = _G['global_font'](15)
   local label_font = _G['global_font'](15)
 
-  local draw_label = function (label, x1, y1, x2, y2)
+  local draw_label = function (half, label, x1, y1, x2, y2)
     love.graphics.setColor(1, 0.5, 0.4)
     love.graphics.setLineWidth(W * 0.002)
-    x1 = img_cx + img_w * img_scale * (x1 - 0.5)
-    x2 = img_cx + img_w * img_scale * (x2 - 0.5)
-    y1 = img_cy + img_h * img_scale * (y1 - 0.5)
-    y2 = img_cy + img_h * img_scale * (y2 - 0.5)
+    local img_cx = img_cx
+    if half == 1 then img_cx = W - img_cx end
+    local img_w, img_h = img_w, img_h
+    if half == 1 then img_w, img_h = prev_img_w, prev_img_h end
+    x1 = img_cx + img_w * (x1 - 0.5)
+    x2 = img_cx + img_w * (x2 - 0.5)
+    y1 = img_cy + img_h * (y1 - 0.5)
+    y2 = img_cy + img_h * (y2 - 0.5)
     love.graphics.rectangle('line', x1, y1, x2 - x1, y2 - y1)
     local t = love.graphics.newText(label_font, label)
     love.graphics.rectangle('fill', x1, y1 - t:getHeight(), t:getWidth(), t:getHeight())
@@ -141,10 +247,21 @@ return function ()
     love.graphics.rectangle('fill', img_x0, img_y0, img_rw, img_rh)
 
     love.graphics.setColor(1, 1, 1)
-    draw.img(cur_img, img_cx, img_cy, img_w * img_scale)
-    for i = 1, #chain[cur_at].labels do
-      local label, x1, y1, x2, y2 = unpack(chain[cur_at].labels[i])
-      draw_label(label, x1, y1, x2, y2)
+    draw.img(cur_img, img_cx, img_cy, img_w)
+
+    if since_reveal >= 0 then
+      draw.img(prev_img, W - img_cx, img_cy, prev_img_w)
+      draw_label(0, unpack(reveal_cur_label))
+      for i = 1, #reveal_prev_labels do
+        draw_label(1, unpack(reveal_prev_labels[i]))
+      end
+    end
+
+    if _G['jam_debug'] then
+      for i = 1, #chain[cur_at].labels do
+        local label, x1, y1, x2, y2 = unpack(chain[cur_at].labels[i])
+        draw_label(0, label, x1, y1, x2, y2)
+      end
     end
   end
 
