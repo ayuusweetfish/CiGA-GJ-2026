@@ -145,7 +145,12 @@ return function ()
     local correct = false
     for i = 1, #chain[cur_at].labels do
       local label_text, x1, y1, x2, y2 = unpack(chain[cur_at].labels[i])
-      if x >= x1 and x <= x2 and y >= y1 and y <= y2 then
+      local w, h = (x2 - x1) * img_w, (y2 - y1) * img_h
+      local tol_x = math.max(4, (36 - w) / 2) / img_w
+      local tol_y = math.max(4, (36 - h) / 2) / img_h
+      if x >= x1 - tol_x and x <= x2 + tol_x and
+         y >= y1 - tol_y and y <= y2 + tol_y
+      then
         -- Is correct?
         if correct_labels[label_text] then
           -- Yes!
