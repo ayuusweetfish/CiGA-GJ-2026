@@ -54,10 +54,10 @@ return function ()
 
   ------------ Chain ------------
 
-  local cur_at = 'm_cant.jpg'
-  local prev_at = 'm_rpsls.jpg'
+  local cur_at = 'a_lang.jpg'
+  local prev_at = 'a_7312.jpg'
   -- Needs a correct label list to handle startup requirement
-  local correct_labels = {['scissors'] = true}
+  local correct_labels = {['point array'] = true}
 
   ------------ Image display ------------
 
