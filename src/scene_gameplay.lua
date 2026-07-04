@@ -95,6 +95,7 @@ return function ()
   local reveal_prev_labels = nil
 
   local since_incorrect = -1
+  local incorrect_x, incorrect_y
 
   ------------ Pointer events ------------
 
@@ -153,6 +154,7 @@ return function ()
     if not correct then
       print('Incorrect')
       since_incorrect = 0
+      incorrect_x, incorrect_y = x, y
     end
 
     is_press_started_on_img = false
@@ -262,6 +264,12 @@ return function ()
         local label, x1, y1, x2, y2 = unpack(chain[cur_at].labels[i])
         draw_label(0, label, x1, y1, x2, y2)
       end
+    end
+
+    if since_incorrect >= 0 then
+      local x = img_cx + img_w * (incorrect_x - 0.5)
+      local y = img_cy + img_h * (incorrect_y - 0.5)
+      draw.img('blossom', x, y, 36)
     end
   end
 
