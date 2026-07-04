@@ -6,6 +6,7 @@
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
+#include <bitset>
 #include <chrono>
 
 using namespace std;
@@ -37,7 +38,12 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  bbox_file_name = "oidv6-train-annotations-bbox.csv";
+  bbox_file_name =
+#if 0
+    "/tmp/bbox-part.csv";
+#else
+    "oidv6-train-annotations-bbox.csv";
+#endif
   labeldesc_file_name = "oidv7-class-descriptions-boxable.csv";
   n_walks = stoi(argv[1]);
 
@@ -57,6 +63,9 @@ int main(int argc, char *argv[]) {
   vector<unordered_set<int>> img_adj;   // temporary sets
   vector<unordered_set<int>> lbl_adj;
 
+  const int MAX_N_LABELS = 600;
+  vector<bitset<MAX_N_LABELS>> img_labels;
+
   string line;
   getline(file, line); // skip header
   while (getline(file, line)) {
@@ -74,6 +83,7 @@ int main(int argc, char *argv[]) {
       image_index[img_id] = img_idx;
       image_ids.push_back(img_id);
       img_adj.emplace_back();
+      img_labels.emplace_back();
     } else {
       img_idx = it_img->second;
     }
@@ -93,6 +103,7 @@ int main(int argc, char *argv[]) {
     // Add edge (both sides)
     img_adj[img_idx].insert(lbl_idx);
     lbl_adj[lbl_idx].insert(img_idx);
+    img_labels[img_idx].set(lbl_idx, true);
   }
   file.close();
 
@@ -204,12 +215,14 @@ int main(int argc, char *argv[]) {
     };
 
     vector<int> walk;
+    int last_image = current;
     for (int step = 0; step < MAX_WALK_LEN - 1; ++step) {
       walk.push_back(current);
       // Collect unvisited neighbors
       vector<int> candidates;
       for (int nb : graph[current]) {
-        if (visited.find(nb) == visited.end() && nonhuman(nb))
+        if (visited.find(nb) == visited.end() &&
+            (nb < I ? true : (/* nonhuman(nb) && */ (img_labels[nb] ^ img_labels[last_image]).count() <= 2)))
           candidates.push_back(nb);
       }
       if (candidates.empty()) break;  // no unvisited neighbor, stop
@@ -218,6 +231,7 @@ int main(int argc, char *argv[]) {
       int next = candidates[rand_int(rng_seed, candidates.size())];
       visited.insert(next);
       current = next;
+      if (current < I) last_image = current;
     }
     walk_lengths[(int)walk.size()] += 1;
     if (walk.size() > checkpoint_longest.size())

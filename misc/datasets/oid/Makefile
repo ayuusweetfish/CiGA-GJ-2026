@@ -5,7 +5,7 @@ $(OUT): main.cc
 	c++ $< -o $@ -O2
 
 run: $(OUT) dataset
-	$(OUT) 100000
+	$(OUT) 1000000
 
 clean:
 	$(RM) -r "$(OUT)"
