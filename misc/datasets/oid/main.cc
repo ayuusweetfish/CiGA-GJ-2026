@@ -6,6 +6,7 @@
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <bitset>
 #include <chrono>
 
@@ -21,6 +22,15 @@ vector<string> split(const string &s, char delim) {
     tokens.push_back(token);
   return tokens;
 }
+
+struct pair_hash {
+  template <typename T1, typename T2>
+  std::size_t operator () (const std::pair<T1, T2> &p) const {
+    auto h1 = std::hash<T1>{}(p.first);
+    auto h2 = std::hash<T2>{}(p.second);
+    return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+  }
+};
 
 string trim_end(const string &s) {
   size_t end = s.find_last_not_of("\n\r\t\f\v");
@@ -63,6 +73,11 @@ int main(int argc, char *argv[]) {
   vector<unordered_set<int>> img_adj;   // temporary sets
   vector<unordered_set<int>> lbl_adj;
 
+  struct bbox {
+    float xmin, xmax, ymin, ymax;
+  };
+  unordered_map<pair<int, int>, bbox, pair_hash> img_lbl_bbox;
+
   const int MAX_N_LABELS = 600;
   vector<bitset<MAX_N_LABELS>> img_labels;
 
@@ -74,6 +89,12 @@ int main(int argc, char *argv[]) {
     if (cols.size() < 3) continue;    // need at least ImageID and LabelName
     string img_id = cols[0];
     string lbl_name = cols[2];
+    bbox box = {
+      .xmin = stof(cols[4]),
+      .xmax = stof(cols[5]),
+      .ymin = stof(cols[6]),
+      .ymax = stof(cols[7]),
+    };
 
     // Map image ID
     int img_idx;
@@ -103,7 +124,11 @@ int main(int argc, char *argv[]) {
     // Add edge (both sides)
     img_adj[img_idx].insert(lbl_idx);
     lbl_adj[lbl_idx].insert(img_idx);
+
+    // Record in bitset
     img_labels[img_idx].set(lbl_idx, true);
+    // Record bounding box
+    img_lbl_bbox[make_pair(img_idx, lbl_idx)] = box;
   }
   file.close();
 
@@ -176,7 +201,7 @@ int main(int argc, char *argv[]) {
   vector<int> checkpoint_longest;
 
   auto print_stats = [I, &image_ids, &label_names, &label_display_name,
-    &walk_lengths, &checkpoint_longest] (int n_walks) -> void
+    &walk_lengths, &checkpoint_longest, &img_lbl_bbox] (int n_walks) -> void
   {
     cout << "Walk length distribution (from " << n_walks << " random walks):\n";
     cout << "Length\tCount\n";
@@ -184,10 +209,30 @@ int main(int argc, char *argv[]) {
       cout << i << "\t" << walk_lengths[i] << "\n";
     }
     cout << "Checkpoint longest (length " << checkpoint_longest.size() << "):\n";
+    int last_image = -1, last_label = -1;
     for (int u : checkpoint_longest) {
-      cout << " -> ";
-      if (u < I) cout << image_ids[u];
-      else cout << label_display_name[label_names[u - I]] << "\n";
+      if (u < I) {
+        auto box = img_lbl_bbox[make_pair(u, last_label)];
+        cout
+          << fixed << setprecision(4) << box.xmin << " "
+          << fixed << setprecision(4) << box.xmax << " "
+          << fixed << setprecision(4) << box.ymin << " "
+          << fixed << setprecision(4) << box.ymax << " "
+          << "-> ";
+        cout << image_ids[u];
+        last_image = u;
+      } else {
+        auto box = img_lbl_bbox[make_pair(last_image, u - I)];
+        cout
+          << " -> "
+          << fixed << setprecision(4) << box.xmin << " "
+          << fixed << setprecision(4) << box.xmax << " "
+          << fixed << setprecision(4) << box.ymin << " "
+          << fixed << setprecision(4) << box.ymax << " "
+          << "| " << label_display_name[label_names[u - I]]
+          << "\n";
+        last_label = u - I;
+      }
     }
     checkpoint_longest.clear();
     cout << endl;
