@@ -1,12 +1,57 @@
-// cc filter_by_imageid.c -o /tmp/f -O2 && echo -e "2a5b1594c3470251\n0e7debb62c4524c0" | /tmp/f
+// cc filter_by_imageid.c -o /tmp/f -O2 && echo -e "2a5b1594c3470251\n0e7debb62c4524c0" | /tmp/f /tmp/chain
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define MAX_LINE_LEN 4096
 #define IMAGE_ID_LEN 16
+
+static int mkdir_p(const char *path, mode_t mode) {
+  // 1. Allocate a mutable copy of the path to manipulate safely
+  char *subpath = strdup(path);
+  if (!subpath) {
+    return -1;
+  }
+
+  int result = 0;
+  char *p = subpath;
+
+  // 2. Skip the leading slash if the path is absolute
+  if (*p == '/') {
+    p++;
+  }
+
+  // 3. Traverse the path and create intermediate directories
+  while ((p = strchr(p, '/')) != NULL) {
+    *p = '\0'; // Temporarily terminate the subpath string
+
+    // Attempt to create the intermediate directory
+    if (mkdir(subpath, mode) != 0) {
+      // It's fine if the directory already exists, but any other error is a failure
+      if (errno != EEXIST) {
+        result = -1;
+        break;
+      }
+    }
+
+    *p = '/'; // Restore the slash
+    p++;      // Move past the slash
+  }
+
+  // 4. Create the final target directory if no errors occurred so far
+  if (result == 0) {
+    if (mkdir(subpath, mode) != 0 && errno != EEXIST)
+      result = -1;
+  }
+
+  free(subpath);
+  return result;
+}
 
 // Function to extract ImageID from a line
 static int extract_image_id(const char *line, char *image_id) {
@@ -180,6 +225,34 @@ int main(int argc, char *argv[]) {
   long file_size;
   long start_pos;
 
+  if (argc < 2) {
+    fprintf(stderr, "Usage: %s <directory>\n", argv[0]);
+    return 1;
+  }
+
+  // Create directory
+  const char *out_dir = argv[1];
+  if (mkdir_p(out_dir, 0755)) {
+    fprintf(stderr, "Error: Could not create directory '%s'\n", out_dir);
+    return 1;
+  }
+
+  size_t fo_name_cap = strlen(out_dir) + 32;
+  char *fo_name = malloc(fo_name_cap);
+  if (fo_name == NULL) {
+    fprintf(stderr, "Error: Memory allocation failed\n");
+    return 1;
+  }
+  snprintf(fo_name, fo_name_cap, "%s/bbox.csv", out_dir);
+  FILE *fo_bbox = fopen(fo_name, "w");
+  snprintf(fo_name, fo_name_cap, "%s/images.csv", out_dir);
+  FILE *fo_images = fopen(fo_name, "w");
+  if (fo_bbox == NULL || fo_images == NULL) {
+    fprintf(stderr, "Error: Could not open output files '%s/*.csv'", out_dir);
+    return 1;
+  }
+  free(fo_name);
+
   // Open file
   fp = fopen(filename, "r");
   if (fp == NULL) {
@@ -201,6 +274,9 @@ int main(int argc, char *argv[]) {
   long data_start = ftell(fp);
 
   int target_id_ptr = 0;
+  int total_target_index = 0;
+
+  // fprintf(fo_bbox, "Index,Label,XMin,XMax,YMin,YMax\n");
 
   while (!feof(stdin)) {
     int c = fgetc(stdin);
@@ -212,18 +288,17 @@ int main(int argc, char *argv[]) {
       target_id_ptr = 0;
     if (target_id_ptr < IMAGE_ID_LEN) continue;
 
+    fprintf(fo_images, "%d,https://open-images-dataset.s3.amazonaws.com/train/%s.jpg\n",
+      total_target_index, target_id);
+
     // Binary search for the target ID
-    // fprintf(stderr, "Processing %s\n", target_id);
     start_pos = binary_search(fp, target_id, data_start, file_size);
 
     if (start_pos == -1) {
-      printf("ImageID '%s' not found\n", target_id);
+      fprintf(stderr, "ImageID '%s' not found\n", target_id);
       fclose(fp);
       return 0;
     }
-
-    // Print header
-    // printf("%s", header);
 
     // Seek to the found position and print all matching lines
     fseek(fp, start_pos, SEEK_SET);
@@ -235,8 +310,6 @@ int main(int argc, char *argv[]) {
       }
 
       if (strcmp(current_id, target_id) == 0) {
-        // printf("%s", line);
-
         char *s = line;
         for (int i = 0; i < 2; i++) {
           if ((s = strchr(s, ',')) == NULL) break; s++;
@@ -251,15 +324,21 @@ int main(int argc, char *argv[]) {
           if ((s = strchr(s, ',')) == NULL) break; s++;
         }
         s[-1] = '\0';
-        printf("%s,%s,%s\n", current_id, bbox_start, find_display_name(label_name));
+        fprintf(fo_bbox, "%d,%s,%s\n",
+          total_target_index, bbox_start, find_display_name(label_name));
 
       } else {
         break; // Since file is sorted by ImageID, we can stop
       }
     }
+
+    total_target_index++;
   }
 
+  fclose(fo_bbox);
+  fclose(fo_images);
   fclose(fp);
+
   return 0;
 }
 
