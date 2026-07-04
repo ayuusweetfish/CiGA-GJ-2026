@@ -23,21 +23,21 @@ vector<string> split(const string &s, char delim) {
 
 // --------------------------------------
 int main(int argc, char *argv[]) {
-  string file_name;
+  string bbox_file_name;
   int n_walks;
 
-  if (argc < 3) {
-    cerr << "Usage: " << argv[0] << " <csv_file> <n_walks>" << endl;
+  if (argc < 2) {
+    cerr << "Usage: " << argv[0] << " <n_walks>" << endl;
     return 1;
   }
 
-  file_name = argv[1];
-  n_walks = stoi(argv[2]);
+  bbox_file_name = "oidv6-train-annotations-bbox.csv";
+  n_walks = stoi(argv[1]);
 
   // ---------- 1. Read CSV ----------
-  ifstream file(file_name);
+  ifstream file(bbox_file_name);
   if (!file.is_open()) {
-    cerr << "Cannot open " << file_name << endl;
+    cerr << "Cannot open " << bbox_file_name << endl;
     return 1;
   }
 
@@ -158,7 +158,7 @@ int main(int argc, char *argv[]) {
   for (int w = 0; w < n_walks; ++w) {
     auto elapsed = chrono::duration_cast<chrono::seconds>(
       chrono::steady_clock::now() - t_start).count();
-    if (elapsed > last_print_elapsed + 3) {
+    if (elapsed >= last_print_elapsed + 3) {
       cout << w << "/" << n_walks << " ("
         << fixed << setprecision(2) << (float)w / n_walks * 100
         << "%)" << endl << endl;
