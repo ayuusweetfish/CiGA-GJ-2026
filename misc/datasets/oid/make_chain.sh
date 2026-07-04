@@ -17,58 +17,59 @@ if [ ! -f "/tmp/f" ]; then
 fi
 "/tmp/f" "$dir"
 
-# Parse and download images
+# Download images.csv using curl --parallel in one command.
+# Each CSV line: <index>,<URL>. Outputs are $dir/<index>.jpg.
 
-# download_images.sh — download all images listed in <dir>/images.csv in parallel.
-#
-# Usage: sh download_images.sh <directory>
-#
-# CSV format (one image per line, no header):
-#   <id>,<url>
-# e.g.   0,https://open-images-dataset.s3.amazonaws.com/train/2a5b1594c3470251.jpg
-#
-# Files are written to <directory>/<id>.jpg
+csvfile="$dir/images.csv"
 
-echo "Downloading images"
-
-csv="$dir/images.csv"
-
-if [ ! -d "$dir" ]; then
-    printf 'Error: not a directory: %s\n' "$dir" >&2
-    exit 1
-fi
-if [ ! -f "$csv" ]; then
-    printf 'Error: images.csv not found under %s\n' "$dir" >&2
-    exit 1
+if [ ! -f "$csvfile" ]; then
+  echo "Error: $csvfile not found" >&2
+  exit 1
 fi
 
-# --- single-image download worker ----------------------------------------------
-# Args: <dir> <id> <url>
-# Writes to <dir>/<id>.jpg; prints a one-line status to stderr on failure.
-download_one() {
-    _dir="$1"; _id="$2"; _url="$3"
-    _out="$_dir/$_id.jpg"
-    echo "$_out"
-    if ! curl -fsSL -o "$_out" "$_url"; then
-        _rc=$?
-        rm -f "$_out"
-        printf 'FAIL %s (curl exit %d): %s\n' "$_id" "$_rc" "$_url" >&2
-        return "$_rc"
-    fi
+(
+# Change to the output directory so filenames are simple (0.jpg, 1.jpg, ...)
+cd "$dir" || exit 1
+
+# Build a command string: curl --parallel -o INDEX.jpg URL -o INDEX.jpg URL ...
+# Shell-escape each argument with single quotes; wrap single quotes in '"'"'".
+quote() {
+  printf '%s\n' "$1" | sed -e "s/'/'\\\\''/g" -e "1s/^/'/" -e "\$s/\$/'/"
 }
 
-# --- read CSV, skip blanks/comments ---------------------
-# Read line by line (handles URLs containing spaces safely), split on first comma.
-while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-        ''|\#*) continue ;;                 # skip blank lines and # comments
-    esac
-    id=${line%%,*}                          # everything before first comma
-    url=${line#*,}                          # everything after first comma
-    # printf '%s\t%s\t%s\n' "$dir" "$id" "$url"
-    download_one "$dir" "$id" "$url"
-done < "$csv"
+# Initialize the args variable with curl --parallel
+args=
+args="${args}curl --parallel "
 
-# --- summary -------------------------------------------------------------------
-total=$(grep -vc '^[[:space:]]*\(#\|$\)' "$csv" 2>/dev/null || printf 0)
-printf 'Done. %d entries processed in %s\n' "$total" "$dir"
+while IFS= read -r line || [ -n "$line" ]; do
+  # Skip empty lines
+  [ -z "$line" ] && continue
+
+  # Trim surrounding whitespace
+  line=$(printf '%s\n' "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+  # Split on first comma: idx and url
+  idx="${line%%,*}"
+  url="${line#*,}"
+
+  if [ -z "$idx" ] || [ -z "$url" ]; then
+    printf 'Malformed line (ignored): %s\n' "$line" >&2
+    continue
+  fi
+
+  # Append -o "$idx.jpg" and "$url", each properly quoted
+  out="${idx}.jpg"
+  args="${args}$(quote '-o') $(quote "$out") $(quote "$url") "
+done < images.csv
+
+# Remove the trailing space from the last appended chunk
+args="${args% }"
+
+# If there are no valid entries, bail out
+case "$args" in
+  "curl --parallel") echo "No valid entries in images.csv" >&2; exit 1 ;;
+esac
+
+# Run the entire curl command in one invocation
+eval "$args"
+)
