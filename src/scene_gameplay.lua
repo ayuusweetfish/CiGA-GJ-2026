@@ -94,8 +94,21 @@ return function ()
   local reveal_cur_label = nil
   local reveal_prev_labels = nil
 
+  local set_reveal_label = function (l)
+    reveal_cur_label = l
+    reveal_prev_labels = {}
+    for j = 1, #chain[prev_at].labels do
+      local lp = chain[prev_at].labels[j]
+      if lp[1] == l[1] then
+        reveal_prev_labels[#reveal_prev_labels + 1] = lp
+      end
+    end
+  end
+
   local since_incorrect = -1
   local incorrect_x, incorrect_y
+
+  local incorrect_count = 0
 
   ------------ Pointer events ------------
 
@@ -136,14 +149,7 @@ return function ()
         -- Is correct?
         if correct_labels[label_text] then
           -- Yes!
-          reveal_cur_label = chain[cur_at].labels[i]
-          reveal_prev_labels = {}
-          for j = 1, #chain[prev_at].labels do
-            local l = chain[prev_at].labels[j]
-            if l[1] == label_text then
-              reveal_prev_labels[#reveal_prev_labels + 1] = l
-            end
-          end
+          set_reveal_label(chain[cur_at].labels[i])
           since_reveal = 0
           correct = true
           break
@@ -152,9 +158,20 @@ return function ()
     end
 
     if not correct then
-      print('Incorrect')
       since_incorrect = 0
       incorrect_x, incorrect_y = x, y
+      incorrect_count = incorrect_count + 1
+      if incorrect_count >= 2 then
+        -- Reveal answer on the second incorrect attempt
+        incorrect_count = 0
+        since_reveal = 0
+        for i = 1, #chain[cur_at].labels do
+          local label_text, x1, y1, x2, y2 = unpack(chain[cur_at].labels[i])
+          if correct_labels[label_text] then
+            set_reveal_label(chain[cur_at].labels[i])
+          end
+        end
+      end
     end
 
     is_press_started_on_img = false
@@ -193,6 +210,7 @@ return function ()
         end
         prev_at, cur_at = cur_at, go_to
         push_cur_img(cur_at)
+        incorrect_count = 0
         since_reveal = -1
       end
     end
