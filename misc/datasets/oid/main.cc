@@ -122,8 +122,10 @@ int main(int argc, char *argv[]) {
     }
 
     // Add edge (both sides)
-    img_adj[img_idx].insert(lbl_idx);
-    lbl_adj[lbl_idx].insert(img_idx);
+    if ((box.xmax - box.xmin) * (box.ymax - box.ymin) < 0.1) {
+      img_adj[img_idx].insert(lbl_idx);
+      lbl_adj[lbl_idx].insert(img_idx);
+    }
 
     // Record in bitset
     img_labels[img_idx].set(lbl_idx, true);
