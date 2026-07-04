@@ -198,13 +198,18 @@ int main(int argc, char *argv[]) {
     unordered_set<int> visited;
     visited.insert(current);
 
+    const auto nonhuman = [I, &label_names, &label_display_name] (int u) -> bool {
+      if (u < I) return true;
+      return label_display_name[label_names[u - I]].find("Human") == std::string::npos;
+    };
+
     vector<int> walk;
     for (int step = 0; step < MAX_WALK_LEN - 1; ++step) {
       walk.push_back(current);
       // Collect unvisited neighbors
       vector<int> candidates;
       for (int nb : graph[current]) {
-        if (visited.find(nb) == visited.end())
+        if (visited.find(nb) == visited.end() && nonhuman(nb))
           candidates.push_back(nb);
       }
       if (candidates.empty()) break;  // no unvisited neighbor, stop
