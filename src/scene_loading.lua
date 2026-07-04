@@ -32,7 +32,7 @@ return function (complete_fn)
       if progress == total then
         complete_fn()
         print('*finish')  -- This removes the progress text in the web page
-        replaceScene(_G['scene_intro']())
+        replaceScene(_G['scene_gameplay'](), _G['transitions']['hardcut']())
       end
     end
     local target_x = W * (0.05 + 0.85 * (progress / total))

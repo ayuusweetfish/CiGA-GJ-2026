@@ -43,6 +43,15 @@ local load_single_image = function (name)
   return i
 end
 
+local load_single_image_extra = function (path)
+  local name = 'extra#' .. path
+  local use_mipmaps = false
+  local data = love.image.newImageData(path)
+  local i = love.graphics.newImage(data, { mipmaps = use_mipmaps })
+  imgs[name] = i
+  return name
+end
+
 local unload_single_image = function (name)
   imgs[name]:release()
   imgs[name] = nil
@@ -118,6 +127,7 @@ end
 local draw_ = {
   load_img_step = load_img_step,
   load = load_single_image,
+  loadx = load_single_image_extra,
   unload = unload_single_image,
 
   get = function (name) return imgs[name] end,

@@ -51,7 +51,6 @@ _G['global_font'] = fontSizeFactory(nil, {28, 36})
 love.graphics.setFont(_G['global_font'](40))
 
 _G['scene_loading'] = require 'scene_loading'
-_G['scene_intro'] = require 'scene_intro'
 
 local audio = require 'audio'
 local bgm, bgm_update
@@ -62,7 +61,9 @@ local curScene = scene_loading(function ()
     'aud/bg_饭_0523a.ogg', (36 * 3) / (184.5 / 60),
     1600 * 4)
   bgm:setVolume(1)
+  bgm:stop()
   _G['scene_intro'] = require 'scene_intro'
+  _G['scene_gameplay'] = require 'scene_gameplay'
 end)
 local lastScene = nil
 local transitionTimer = 0
@@ -142,11 +143,19 @@ function love.update(dt)
   sinceAudioUpdate = sinceAudioUpdate + dt
   if sinceAudioUpdate >= 0.5 then
     sinceAudioUpdate = sinceAudioUpdate - 0.5
-    if bgm_update then bgm_update() end
+    -- if bgm_update then bgm_update() end
   end
   audio.sfx_update(dt)
 end
 
+transitions['hardcut'] = function ()
+  return {
+    dur = 0,
+    draw = function (x)
+      curScene:draw()
+    end
+  }
+end
 transitions['fade'] = function (r, g, b)
   return {
     dur = 120,

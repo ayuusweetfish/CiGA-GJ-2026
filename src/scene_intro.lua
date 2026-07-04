@@ -12,7 +12,7 @@ return function ()
   local btn = button(
     draw.enclose(love.graphics.newText(font(36), 'Start'), 120, 60),
     function ()
-      replaceScene(_G['scene_intro'](), transitions['fade'](0.1, 0.1, 0.1))
+      replaceScene(_G['scene_gameplay'](), transitions['fade'](0.1, 0.1, 0.1))
       audio.sfx('newspaper')
     end
   )
