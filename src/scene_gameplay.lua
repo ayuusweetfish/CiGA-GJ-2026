@@ -270,6 +270,18 @@ return function ()
     love.graphics.clear(0, 0, 0.5)
     love.graphics.setColor(1, 1, 1)
 
+    love.graphics.push()
+    if since_incorrect >= 0 and since_incorrect < 120 then
+      local t = math.floor(since_incorrect / 10) * 10
+      local x = love.math.noise(234, t * 0.876)
+      local y = love.math.noise(t * 0.876, 123)
+      local d = 8 * math.exp(-t * 0.02)
+      love.graphics.translate(
+        math.floor(x * d - d / 2),
+        math.floor(y * d - d / 2)
+      )
+    end
+
     draw_window(W, H, W * 0.5, H * 0.5)
     draw_lupa(2, 24, W - 2, img_y0 + img_rh + 1 + (img_y0 - 24))
 
@@ -308,6 +320,8 @@ return function ()
       love.graphics.setColor(1, 1, 1)
       draw.img('blossom', x, y, 36)
     end
+
+    love.graphics.pop()
   end
 
   s.destroy = function ()
