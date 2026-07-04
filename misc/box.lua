@@ -13,6 +13,7 @@ while true do
   if #fields == 0 then  -- No-op
   elseif #fields ~= 6 then print('Invalid')
   else
-    print(f((table.unpack or unpack)(fields)))
+    print(string.format('%.3f,%.3f,%.3f,%.3f',
+      f((table.unpack or unpack)(fields))))
   end
 end
