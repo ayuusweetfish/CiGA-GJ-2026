@@ -175,7 +175,7 @@ return function ()
           set_reveal_label(chain[cur_at].labels[i])
           since_reveal = 0
           reveal_due_to_currect = true
-          correct_bonus = 80 + math.max(0, math.min(720, 960 - health)) / 4.5
+          correct_bonus = 40 + math.max(0, math.min(800, 960 - health)) / 4
           health = health + correct_bonus
           if health >= 960 then
             -- TODO: Win?
