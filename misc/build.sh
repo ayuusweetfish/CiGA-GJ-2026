@@ -2,7 +2,7 @@ LOVE_FILE="/tmp/CGJ2026_🐟🐐🍎🌰/CGJ2026_🐟🐐🍎🌰.love"
 
 t=$(mktemp -d)
 wd=$PWD
-cp -pr aud img main.lua src "$t/"
+cp -pr aud img main.lua src chain "$t/"
 (
   cd "$t/" || exit
   if [ "$1" != "nomin" ]; then
