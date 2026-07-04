@@ -91,9 +91,14 @@ return function ()
 
   ------------ State ------------
 
+  local health = 480
+  local correct_bonus = 240
+  local incorrect_penalty = 120
+
   local since_reveal = -1
   local reveal_cur_label = nil
   local reveal_prev_labels = nil
+  local reveal_due_to_currect = false
 
   local set_reveal_label = function (l)
     reveal_cur_label = l
@@ -169,6 +174,12 @@ return function ()
           -- Yes!
           set_reveal_label(chain[cur_at].labels[i])
           since_reveal = 0
+          reveal_due_to_currect = true
+          correct_bonus = 80 + math.max(0, math.min(720, 960 - health)) / 4.5
+          health = health + correct_bonus
+          if health >= 960 then
+            -- TODO: Win?
+          end
           correct = true
           break
         end
@@ -182,13 +193,18 @@ return function ()
       if incorrect_count >= 2 then
         -- Reveal answer on the second incorrect attempt
         incorrect_count = 0
-        since_reveal = 0
         for i = 1, #chain[cur_at].labels do
           local label_text, x1, y1, x2, y2 = unpack(chain[cur_at].labels[i])
           if correct_labels[label_text] then
             set_reveal_label(chain[cur_at].labels[i])
           end
         end
+        since_reveal = 0
+        reveal_due_to_currect = false
+      end
+      health = health - incorrect_penalty
+      if health < 0 then
+        -- TODO: Lose?
       end
     end
 
@@ -231,6 +247,13 @@ return function ()
         push_cur_img(cur_at)
         incorrect_count = 0
         since_reveal = -1
+      end
+    end
+
+    if btn_flip.inside then
+      health = health - 0.5
+      if health <= 0 then
+        health = 0
       end
     end
   end
@@ -350,6 +373,28 @@ return function ()
         btn_flip.y + (btn_flip.inside and 1 or 0),
         nil, nil, 0.5, 0.5)
     end
+
+    local health_bar_start = 4
+    local health_bar_end = W - 4
+    local health_bar_t = health / 960
+    if since_reveal >= 0 and reveal_due_to_currect then
+      local t = math.min(1, since_reveal / 240)
+      t = (1 - t) * math.exp(-4 * t)
+      health_bar_t = health_bar_t - correct_bonus / 960 * t
+    end
+    if since_incorrect >= 0 then
+      local t = math.min(1, since_incorrect / 120)
+      t = (1 - t) * math.exp(-4 * t)
+      health_bar_t = health_bar_t + incorrect_penalty / 960 * t
+    end
+    health_bar_t = math.max(0, math.min(1, health_bar_t))
+    love.graphics.setColor(0.2, 0.3, 0.2)
+    love.graphics.rectangle('fill',
+      health_bar_start,
+      math.floor(H * 0.875),
+      math.floor((health_bar_end - health_bar_start) * health_bar_t + 0.5),
+      math.floor(H * 0.02)
+    )
 
     love.graphics.pop()
   end
