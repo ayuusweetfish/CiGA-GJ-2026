@@ -1,4 +1,4 @@
-return function (drawable, fn)
+return function (drawable, fn, alt_drawable)
   local s = {}
   local W, H = W, H
 
@@ -11,14 +11,14 @@ return function (drawable, fn)
   local scale = 1
 
   local held = false
-  local inside = false
+  s.inside = false
 
   s.press = function (x, y)
     if not s.enabled then return false end
     if x >= s.x - w/2 and x <= s.x + w/2 and
        y >= s.y - h/2 and y <= s.y + h/2 then
       held = true
-      inside = true
+      s.inside = true
       return true
     else
       return false
@@ -27,7 +27,7 @@ return function (drawable, fn)
 
   s.move = function (x, y)
     if not held then return false end
-    inside =
+    s.inside =
       x >= s.x - w/2 and x <= s.x + w/2 and
       y >= s.y - h/2 and y <= s.y + h/2
     return true
@@ -35,23 +35,26 @@ return function (drawable, fn)
 
   s.release = function (x, y)
     if not held then return false end
-    if inside then fn() inside = false end
+    if s.inside then fn() s.inside = false end
     held = false
     return true
   end
 
   s.update = function ()
-    local target = (inside and 1.12 or 1)
-    if math.abs(target - scale) <= 0.005 then
-      scale = target
-    else
-      scale = scale + (target - scale) * 0.1
+    if not alt_drawable then
+      local target = (s.inside and 1.12 or 1)
+      if math.abs(target - scale) <= 0.005 then
+        scale = target
+      else
+        scale = scale + (target - scale) * 0.1
+      end
     end
   end
 
   s.draw = function ()
     local sc = scale * s.s
     local x, y, sc = s.x - w/2 * sc, s.y - h/2 * sc, sc
+    local drawable = (s.inside and alt_drawable or drawable)
     if drawable.draw then
       drawable:draw(x, y, sc)
     else

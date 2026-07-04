@@ -1,4 +1,5 @@
 local draw = require 'utils/draw'
+local button = require 'utils/button'
 local audio = require 'audio'
 
 local parse_chain = function (box_csv, links_csv)
@@ -110,6 +111,13 @@ return function ()
 
   local incorrect_count = 0
 
+  ------------ Widgets ------------
+
+  local btn_flip = button(draw.get('button_ord'), function ()
+  end, draw.get('button_press'))
+  btn_flip.x = math.floor(W * 0.08)
+  btn_flip.y = math.floor(H * 0.75)
+
   ------------ Pointer events ------------
 
   local pt_on_img = function (x, y)
@@ -125,6 +133,8 @@ return function ()
   local is_press_started_on_img = false
 
   s.press = function (x, y)
+    if btn_flip.press(x, y) then return true end
+
     if since_reveal >= 0 or since_incorrect >= 0 then return true end
     is_press_started_on_img = (pt_on_img(x, y) ~= nil)
     return is_press_started_on_img
@@ -134,9 +144,12 @@ return function ()
   end
 
   s.move = function (x, y)
+    if btn_flip.move(x, y) then return true end
   end
 
   s.release = function (x, y)
+    if btn_flip.release(x, y) then return true end
+
     if not is_press_started_on_img then return end
     x, y = pt_on_img(x, y)
     if not x then return end
@@ -186,6 +199,7 @@ return function ()
   ------------ Update ------------
 
   s.update = function ()
+    btn_flip.update()
     if since_incorrect >= 0 then
       since_incorrect = since_incorrect + 1
       if since_incorrect >= 240 then
@@ -266,6 +280,8 @@ return function ()
   local t1 = love.graphics.newText(font, '验证您是人类：')
   local t2 = love.graphics.newText(font, '请在这张图片中找出上一张图片内\n出现过的同类物体')
 
+  local btn_flip_t = love.graphics.newText(font, '上一张')
+
   s.draw = function ()
     love.graphics.clear(0, 0, 0.5)
     love.graphics.setColor(1, 1, 1)
@@ -291,14 +307,18 @@ return function ()
     love.graphics.setColor(1, 1, 1)
     draw.img(cur_img, img_cx, img_cy, img_w)
 
-    if since_reveal >= 0 and (since_incorrect < 0 or since_incorrect >= 120) then
+    if (since_reveal >= 0 and (since_incorrect < 0 or since_incorrect >= 120))
+      or btn_flip.inside
+    then
       love.graphics.setColor(1, 1, 1, 0.5)
       love.graphics.rectangle('fill', W - (img_x0 + img_rw), img_y0, img_rw, img_rh)
       love.graphics.setColor(1, 1, 1)
       draw.img(prev_img, W - img_cx, img_cy, prev_img_w)
-      draw_label(0, unpack(reveal_cur_label))
-      for i = 1, #reveal_prev_labels do
-        draw_label(1, unpack(reveal_prev_labels[i]))
+      if since_reveal >= 0 then
+        draw_label(0, unpack(reveal_cur_label))
+        for i = 1, #reveal_prev_labels do
+          draw_label(1, unpack(reveal_prev_labels[i]))
+        end
       end
     else
       love.graphics.setColor(0, 0, 0)
@@ -319,6 +339,16 @@ return function ()
       local y = img_cy + img_h * (incorrect_y - 0.5)
       love.graphics.setColor(1, 1, 1)
       draw.img('blossom', x, y, 36)
+    end
+
+    if since_reveal < 0 then
+      love.graphics.setColor(1, 1, 1)
+      btn_flip.draw()
+      love.graphics.setColor(0, 0, 0)
+      draw(btn_flip_t,
+        btn_flip.x + (btn_flip.inside and -1 or 0),
+        btn_flip.y + (btn_flip.inside and 1 or 0),
+        nil, nil, 0.5, 0.5)
     end
 
     love.graphics.pop()
