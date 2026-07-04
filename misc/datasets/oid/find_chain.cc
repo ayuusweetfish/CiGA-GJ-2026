@@ -11,6 +11,7 @@
 #include <chrono>
 #include <random>
 #include <algorithm>
+#include <queue>          // added for BFS
 
 using namespace std;
 
@@ -47,25 +48,49 @@ string trim(const string &s) {
   return s.substr(start, end - start + 1);
 }
 
-// --------------------------------------
-int main(int argc, char *argv[]) {
-  string bbox_file_name;
-  string labeldesc_file_name;
-  int n_walks;
+#include <unistd.h>
+#include <termios.h>
 
-  if (argc < 2) {
-    cerr << "Usage: " << argv[0] << " <n_walks>" << endl;
-    return 1;
+int set_canonical_mode() {
+  struct termios tty_settings;
+
+  // 1. Get current terminal attributes for standard input
+  if (tcgetattr(STDIN_FILENO, &tty_settings) != 0) {
+    perror("tcgetattr failed");
+    return -1;
   }
 
+  // 2. Set the ICANON bit to enable canonical mode
+  tty_settings.c_lflag |= ICANON;
+
+  // Optional: Turn standard local echo back on if it was disabled
+  tty_settings.c_lflag |= ECHO;
+
+  // Set erase character to Backspace
+  tty_settings.c_cc[VERASE] = 0x08;
+
+  // 3. Apply the modified attributes immediately
+  if (tcsetattr(STDIN_FILENO, TCSANOW, &tty_settings) != 0) {
+    perror("tcsetattr failed");
+    return -1;
+  }
+
+  return 0;
+}
+
+// --------------------------------------
+int main(int argc, char *argv[]) {
+  set_canonical_mode();
+  string bbox_file_name;
+  string labeldesc_file_name;
+
   bbox_file_name =
-#if 0
+#if 1
     "/tmp/bbox-part.csv";
 #else
     "oidv6-train-annotations-bbox.csv";
 #endif
   labeldesc_file_name = "oidv7-class-descriptions-boxable.csv";
-  n_walks = stoi(argv[1]);
 
   // Random engine for walks
   random_device rd;
@@ -154,16 +179,16 @@ int main(int argc, char *argv[]) {
       lbl_idx = it_lbl->second;
     }
 
-    // Add edge (both sides)
+    // Add edge (both sides) – only small non‑human objects
     if (
       (box.xmax - box.xmin) * (box.ymax - box.ymin) < 0.1 &&
-      label_display_name[label_names[lbl_idx]].find("Human") == std::string::npos
+      true // label_display_name[label_names[lbl_idx]].find("Human") == std::string::npos
     ) {
       img_adj[img_idx].insert(lbl_idx);
       lbl_adj[lbl_idx].insert(img_idx);
     }
 
-    // Record in bitset
+    // Record all labels of the image (regardless of the filter)
     img_labels[img_idx].set(lbl_idx, true);
     // Record bounding box
     img_lbl_bbox[make_pair(img_idx, lbl_idx)] = box;
@@ -202,15 +227,15 @@ int main(int argc, char *argv[]) {
   }
 
   // ---------- 4. Build display name -> label index mapping ----------
-  unordered_map<string, vector<int>> display_to_labels;
+  unordered_map<string, int> display_to_labels;
   for (int i = 0; i < L; ++i) {
     auto it = label_display_name.find(label_names[i]);
     if (it != label_display_name.end()) {
-      display_to_labels[it->second].push_back(i);
+      display_to_labels[it->second] = i;
     }
   }
 
-  // ---------- 5. Query loop (random walks) ----------
+  // ---------- 5. Query loop ----------
   cerr << "Ready for queries. Enter 'DisplayName1, DisplayName2' per line." << endl;
   string query_line;
   while (getline(cin, query_line)) {
@@ -228,125 +253,139 @@ int main(int argc, char *argv[]) {
 
     auto it1 = display_to_labels.find(name1);
     auto it2 = display_to_labels.find(name2);
-    if (it1 == display_to_labels.end() || it1->second.empty()) {
+    if (it1 == display_to_labels.end()) {
       cout << "Unknown label: " << name1 << endl;
       continue;
-    }
-    if (it2 == display_to_labels.end() || it2->second.empty()) {
+    } if (it2 == display_to_labels.end()) {
       cout << "Unknown label: " << name2 << endl;
       continue;
     }
 
-    // For simplicity take the first matching label index.
-    // (If multiple labels share the same display name, we could try all; 
-    //  here we just pick the first.)
-    int start_label = it1->second[0];
-    int target_label = it2->second[0];
+    // Try every combination of start / target label indices
+    bool found = false;
+    vector<int> path_vertices;   // will hold the alternating chain
 
-    // If start == target, just output a single image containing it.
+    auto t_start = chrono::steady_clock::now();
+
+    int start_label = it1->second;
+    int target_label = it2->second;
+
+    // Simple case: same label
     if (start_label == target_label) {
-      if (lbl_adj_vec[start_label].empty()) {
-        cout << "No chain found (label has no images)." << endl;
-        continue;
-      }
-      int img = lbl_adj_vec[start_label][0];
-      bbox box = img_lbl_bbox.at({img, start_label});
-      string disp = label_display_name.at(label_names[start_label]);
-      cout << fixed << setprecision(4);
-      cout << box.xmin << " " << box.xmax << " " << box.ymin << " " << box.ymax
-           << " -> " << image_ids[img] << " -> "
-           << box.xmin << " " << box.xmax << " " << box.ymin << " " << box.ymax
-           << " | " << disp << endl;
-      continue;
+      found = true;
+      path_vertices = {I + start_label};   // label vertex
+      break;
     }
 
-    bool found = false;
-    uniform_int_distribution<size_t> dist;
+    // ---------- BFS with image‑difference constraint ----------
+    // State: (vertex, last_image)   -1 means no image yet
+    queue<pair<int, int>> q;
+    unordered_map<pair<int, int>, pair<int, int>, pair_hash> parent;
+    unordered_set<pair<int, int>, pair_hash> visited;
 
-    // Perform n_walks random walks
-    for (int walk = 0; walk < n_walks && !found; ++walk) {
-      // Random starting image containing start_label
-      const auto &start_imgs = lbl_adj_vec[start_label];
-      if (start_imgs.empty()) continue;
-      int cur_img = start_imgs[rng() % start_imgs.size()];
+    pair<int, int> start_state = {I + start_label, -1};
+    q.push(start_state);
+    visited.insert(start_state);
+    parent[start_state] = {-1, -1};   // sentinel
 
-      vector<int> img_seq = {cur_img};
-      vector<int> lbl_seq;   // labels connecting images
+    while (!q.empty()) {
+      auto [v, last_img] = q.front();
+      q.pop();
 
-      bool dead_end = false;
-      const int MAX_STEPS = 50;
-      for (int step = 0; step < MAX_STEPS; ++step) {
-        // Check if target reached
-        if (img_labels[cur_img].test(target_label)) {
-          found = true;
-          break;
+      if (v == I + target_label) {   // reached target label vertex
+        found = true;
+        // reconstruct path
+        pair<int, int> cur = {v, last_img};
+        while (cur != make_pair(-1, -1)) {
+          path_vertices.push_back(cur.first);
+          cur = parent[cur];
         }
+        reverse(path_vertices.begin(), path_vertices.end());
+        break;
+      }
 
-        // Gather candidate (label, next_image) pairs
-        vector<pair<int, int>> candidates;
-        for (int lbl : img_adj_vec[cur_img]) {
-          const auto &imgs = lbl_adj_vec[lbl];
-          if (imgs.size() <= 1) continue; // only the current image itself
-          // Try up to 100 random images from this label
-          int attempts = min<int>(100, imgs.size());
-          for (int a = 0; a < attempts; ++a) {
-            int nxt = imgs[rng() % imgs.size()];
-            if (nxt == cur_img) continue;
-            // Check that the two images share at most 2 labels
-            if ((img_labels[cur_img] & img_labels[nxt]).count() <= 2) {
-              candidates.push_back({lbl, nxt});
-              break;
-            }
+      if (v >= I) {   // label vertex -> image neighbours
+        int L_idx = v - I;
+        for (int I_next : graph[v]) {
+          if (last_img != -1) {
+            // Constraint: I_last and I_next share at most 2 labels
+            if ((img_labels[last_img] & img_labels[I_next]).count() > 2)
+              continue;
+          }
+          pair<int, int> nxt = {I_next, I_next};
+          if (visited.find(nxt) == visited.end()) {
+            visited.insert(nxt);
+            parent[nxt] = {v, last_img};
+            q.push(nxt);
           }
         }
-
-        if (candidates.empty()) {
-          dead_end = true;
-          break;
-        }
-
-        // Pick random candidate
-        auto [lbl, nxt] = candidates[rng() % candidates.size()];
-        lbl_seq.push_back(lbl);
-        cur_img = nxt;
-        img_seq.push_back(cur_img);
-      }
-
-      if (found) {
-        // Print the chain
-        int n = img_seq.size();
-        const auto label = [&] (int i) -> int {
-          if (i < 0) return start_label;
-          if (i >= n - 1) return target_label;
-          return lbl_seq[i];
-        };
-        for (int i = -1; i <= n; ++i) {
-          int img = img_seq[i < 0 ? 0 : i >= n ? n - 1 : i];
-          int in_lbl = label(i - 1);
-          int out_lbl = label(i);
-
-          bbox b1 = img_lbl_bbox.at({img, in_lbl});
-          bbox b2 = img_lbl_bbox.at({img, out_lbl});
-          if (i < 0) b1 = (bbox){0};
-          string img_id_str = image_ids[img];
-          string out_disp = label_display_name.at(label_names[out_lbl]);
-
-          cout << fixed << setprecision(4);
-          cout << b1.xmin << " " << b1.xmax << " " << b1.ymin << " " << b1.ymax
-            << " -> " << img_id_str;
-          if (i < n)
-            cout << " -> "
-              << b2.xmin << " " << b2.xmax << " " << b2.ymin << " " << b2.ymax
-              << " | " << out_disp;
-          cout << endl;
+      } else {        // image vertex -> label neighbours
+        for (int L_next : graph[v]) {
+          pair<int, int> nxt = {L_next, v};
+          if (visited.find(nxt) == visited.end()) {
+            visited.insert(nxt);
+            parent[nxt] = {v, last_img};
+            q.push(nxt);
+          }
         }
       }
+
+      if (chrono::duration_cast<chrono::seconds>(
+      chrono::steady_clock::now() - t_start).count() >= 10) break;
     }
 
-    if (!found) {
-      cout << "No chain found between '" << name1 << "' and '" << name2 << "'." << endl;
-    }
+    // ---------- Print the chain ----------
+    if (found) {
+      cout << "Chain found (" << path_vertices.size() << " vertices):" << endl;
+      if (0) for (size_t i = 0; i < path_vertices.size(); ++i) {
+        int v = path_vertices[i];
+        if (v >= I) {   // label
+          int lbl = v - I;
+          string dname = label_display_name.count(label_names[lbl]) ?
+                         label_display_name[label_names[lbl]] : "?";
+          cout << "L" << lbl << "(" << dname << ")";
+        } else {        // image
+          cout << "I" << v << "(" << image_ids[v] << ")";
+        }
+        if (i + 1 < path_vertices.size()) cout << " -> ";
+      }
+
+      int n = path_vertices.size() / 2;
+      const auto image = [&] (int i) -> int {
+        if (i < 0) i = 0;
+        if (i >= n) i = n - 1;
+        return path_vertices[i * 2 + 1];
+      };
+      const auto label = [&] (int i) -> int {
+        if (i < 0) return path_vertices[0] - I;
+        if (i >= n - 1) return path_vertices[n * 2] - I;
+        return path_vertices[i * 2 + 2] - I;
+      };
+      for (int i = -1; i <= n; ++i) {
+        int img = image(i);
+        int in_lbl = label(i - 1);
+        int out_lbl = label(i);
+
+        bbox b1 = img_lbl_bbox.at({img, in_lbl});
+        bbox b2 = img_lbl_bbox.at({img, out_lbl});
+        if (i < 0) b1 = (bbox){0};
+        string img_id_str = image_ids[img];
+        string out_disp = label_display_name.at(label_names[out_lbl]);
+
+        cout << fixed << setprecision(4);
+        cout << b1.xmin << " " << b1.xmax << " " << b1.ymin << " " << b1.ymax
+          << " -> " << img_id_str;
+        if (i < n)
+          cout << " -> "
+            << b2.xmin << " " << b2.xmax << " " << b2.ymin << " " << b2.ymax
+            << " | " << out_disp;
+        cout << endl;
+      }
+    cout << endl;
+  } else {
+    cerr << "No chain found between '" << name1 << "' and '" << name2 << "'." << endl;
   }
+}
 
-  return 0;
+return 0;
 }

@@ -1,4 +1,4 @@
-F ?= random_walk
+F ?= find_chain
 OUT ?= /tmp/oid_$(F).out
 
 $(OUT): $(F).cc
