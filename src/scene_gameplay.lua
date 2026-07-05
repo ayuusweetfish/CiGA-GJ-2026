@@ -50,16 +50,16 @@ local chain = parse_chain(
   love.filesystem.read('chain/_links.csv')
 )
 
-return function ()
+return function (start_at)
   local s = {}
   local W, H = W, H
 
   ------------ Chain ------------
 
-  local cur_at = 'a_lang.jpg'
-  local prev_at = 'a_7312.jpg'
+  local cur_at = start_at
+  local prev_at
   -- Needs a correct label list to handle startup requirement
-  local correct_labels = {['point array'] = true}
+  local correct_labels
 
   ------------ Image display ------------
 
@@ -87,8 +87,31 @@ return function ()
     img_w = img_w * scale
     img_h = img_h * scale
   end
-  push_cur_img(prev_at)
   push_cur_img(cur_at)
+
+  -- Find and move to a new target
+  local move_to_random_next = function ()
+    local out_links = chain[cur_at].links
+    if #out_links == 0 then
+      return  -- XXX: This should not happen! Debug use only
+    end
+    local go_to = out_links[love.math.random(#out_links)]
+    correct_labels = {}
+    local cur_labels = {}
+    for i = 1, #chain[cur_at].labels do
+      local label_name = chain[cur_at].labels[i][1]
+      cur_labels[label_name] = true
+    end
+    for i = 1, #chain[go_to].labels do
+      local label_name = chain[go_to].labels[i][1]
+      if cur_labels[label_name] then
+        correct_labels[label_name] = true
+      end
+    end
+    prev_at, cur_at = cur_at, go_to
+    push_cur_img(cur_at)
+  end
+  move_to_random_next()
 
   ------------ State ------------
 
@@ -226,26 +249,8 @@ return function ()
     if since_reveal >= 0 and (since_incorrect < 0 or since_incorrect > 120) then
       since_reveal = since_reveal + 1
       if since_reveal >= 600 then
-        -- Find a new target
-        local out_links = chain[cur_at].links
-        if #out_links == 0 then
-          return  -- XXX: This should not happen! Debug use only
-        end
-        local go_to = out_links[love.math.random(#out_links)]
-        correct_labels = {}
-        local cur_labels = {}
-        for i = 1, #chain[cur_at].labels do
-          local label_name = chain[cur_at].labels[i][1]
-          cur_labels[label_name] = true
-        end
-        for i = 1, #chain[go_to].labels do
-          local label_name = chain[go_to].labels[i][1]
-          if cur_labels[label_name] then
-            correct_labels[label_name] = true
-          end
-        end
-        prev_at, cur_at = cur_at, go_to
-        push_cur_img(cur_at)
+        -- Find and move to a new target
+        move_to_random_next()
         incorrect_count = 0
         since_reveal = -1
       end

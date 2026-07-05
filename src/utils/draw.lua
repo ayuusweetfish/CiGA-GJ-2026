@@ -45,6 +45,7 @@ end
 
 local load_single_image_extra = function (path)
   local name = 'extra#' .. path
+  if imgs[name] then return name end
   local use_mipmaps = false
   local data = love.image.newImageData(path)
   local i = love.graphics.newImage(data, { mipmaps = use_mipmaps })
