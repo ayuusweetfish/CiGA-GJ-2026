@@ -223,7 +223,8 @@ return function (start_at)
           correct_bonus = 40 + math.max(0, math.min(800, 960 - health)) / 4
           health = health + correct_bonus
           if health >= 960 then
-            -- TODO: Win?
+            -- TODO: Win? Currently patchwork
+            if health >= 1000 then health = 1000 end
           end
           correct = true
           break
@@ -249,7 +250,8 @@ return function (start_at)
       end
       health = health - incorrect_penalty
       if health < 0 then
-        -- TODO: Lose?
+        -- TODO: Lose? Currently patchwork
+        if health <= -180 then health = -180 end
       end
     end
 
@@ -310,6 +312,7 @@ return function (start_at)
 
   local t1 = love.graphics.newText(font, '验证您是人类：')
   local t2 = love.graphics.newText(font, '请在这张图片中找出上一张图片内\n出现过的同类物体')
+  local t10 = love.graphics.newText(font, '人类置信度')
 
   local btn_flip_t = love.graphics.newText(font, '上一张')
 
@@ -358,6 +361,9 @@ return function (start_at)
       draw(t1, 14, title_y + 0, nil, nil, 0, 0)
       draw(t2, 14, title_y + 24, nil, nil, 0, 0)
     end
+
+    love.graphics.setColor(0.5, 0.5, 0.5)
+    draw(t10, 4, math.floor(H * 0.91), nil, nil, 0, 0)
 
     if _G['jam_debug'] then
       for i = 1, #chain[cur_at].labels do
