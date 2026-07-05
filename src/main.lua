@@ -117,7 +117,7 @@ function love.keypressed(key)
       updateLogicalDimensions()
     end
   elseif key == 'space' then
-    isPaused = not isPaused
+    -- isPaused = not isPaused
   elseif key == keyLCmd then isLCmdDown = true
   elseif key == keyRCmd then isRCmdDown = true
   elseif key == 'q' and (isLCmdDown or isRCmdDown) then
@@ -216,11 +216,12 @@ function love.draw()
     cursor_index = 1 + (math.floor(since_click / 20) + 1) % 4
   end
   local cursor = draw.get('cursor-' .. cursor_index)
-  if cursor ~= nill then
+  if cursor ~= nil then
     love.graphics.setColor(1, 1, 1)
     draw(cursor, math.floor(mouseX + 1.5), math.floor(mouseY + 1.5), 32, nil, 0.25, 0.25)
     love.graphics.setColor(0, 0, 0)
     draw(cursor, math.floor(mouseX + 0.5), math.floor(mouseY + 0.5), 32, nil, 0.25, 0.25)
   end
+  love.mouse.setVisible(false)
   love.graphics.pop()
 end
