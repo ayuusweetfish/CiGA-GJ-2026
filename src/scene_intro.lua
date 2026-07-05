@@ -1,52 +1,60 @@
 local draw = require 'utils/draw'
 local button = require 'utils/button'
 local audio = require 'audio'
+local window_frame = require 'window_frame'
 
 return function ()
   local s = {}
   local W, H = W, H
-  local font = _G['global_font']
+  local font = _G['global_font'](15)
 
-  local t1 = love.graphics.newText(font(80), 'Game')
-
-  local btn = button(
-    draw.enclose(love.graphics.newText(font(36), 'Start'), 120, 60),
-    function ()
-      replaceScene(_G['scene_gameplay'](), transitions['fade'](0.1, 0.1, 0.1))
-      audio.sfx('newspaper')
-    end
-  )
-  btn.x = W * 0.5
-  btn.y = H * 0.65
-  local buttons = { btn }
+  local btn_confirm = button(draw.get('button_ord'), function ()
+    replaceScene(_G['scene_gameplay'](), _G['transitions']['hardcut']())
+  end, draw.get('button_press'))
+  btn_confirm.x = math.floor(W * 0.5)
+  btn_confirm.y = math.floor(H * 0.65)
 
   s.press = function (x, y)
-    for i = 1, #buttons do if buttons[i].press(x, y) then return true end end
+    if btn_confirm.press(x, y) then return true end
   end
 
   s.hover = function (x, y)
   end
 
   s.move = function (x, y)
-    for i = 1, #buttons do if buttons[i].move(x, y) then return true end end
+    if btn_confirm.move(x, y) then return true end
   end
 
   s.release = function (x, y)
-    for i = 1, #buttons do if buttons[i].release(x, y) then return true end end
+    if btn_confirm.release(x, y) then return true end
   end
 
   s.update = function ()
-    for i = 1, #buttons do buttons[i].update() end
+    btn_confirm.update()
   end
 
-  s.draw = function ()
-    love.graphics.clear(0.996, 0.988, 0.878)
-    love.graphics.setColor(1, 1, 1)
-    draw.img('intro_bg', W / 2, H / 2, W, H)
-    draw.shadow(0.1, 0.1, 0.1, 1, t1, W / 2, H * 0.35)
+  local btn_confirm_t = love.graphics.newText(_G['global_font'](15), '确认')
 
-    love.graphics.setColor(0.1, 0.1, 0.1)
-    for i = 1, #buttons do buttons[i].draw() end
+  s.draw = function ()
+    love.graphics.clear(0, 0, 0.5)
+    love.graphics.setColor(1, 1, 1)
+
+    local window_w = math.floor(W * 0.5)
+    local window_h = math.floor(H * 0.5)
+
+    window_frame.draw_window('Anchor Verification System',
+      window_w, window_h, W * 0.5, H * 0.5)
+    window_frame.draw_lupa(
+      window_w, window_h, W * 0.5, H * 0.5,
+      2, 24, window_w - 2, window_h - 2)
+
+    love.graphics.setColor(1, 1, 1)
+    btn_confirm.draw()
+    love.graphics.setColor(0, 0, 0)
+    draw(btn_confirm_t,
+      btn_confirm.x + (btn_confirm.inside and -1 or 0),
+      btn_confirm.y + (btn_confirm.inside and 1 or 0),
+      nil, nil, 0.5, 0.5)
   end
 
   s.destroy = function ()
