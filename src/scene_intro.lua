@@ -8,7 +8,7 @@ return function ()
   local W, H = W, H
   local font = _G['global_font'](15)
 
-  local start_at = 'a_7312.jpg'
+  local start_at = 'jam1_20.JPG'
   local start_img = draw.loadx('chain/' .. start_at)
 
   local next_scene = _G['scene_gameplay'](start_at)
