@@ -295,15 +295,24 @@ return function (start_at)
   local font = _G['global_font'](15)
   local label_font = _G['global_font'](15)
 
-  local draw_label = function (half, label, x1, y1, x2, y2)
+  local draw_label = function (half, tex, label, x1, y1, x2, y2)
     local img_cx = img_cx
     if half == 1 then img_cx = W - img_cx end
     local img_w, img_h = img_w, img_h
     if half == 1 then img_w, img_h = prev_img_w, prev_img_h end
+    local x1r, x2r, y1r, y2r = x1, x2, y1, y2
     x1 = img_cx + img_w * (x1 - 0.5)
     x2 = img_cx + img_w * (x2 - 0.5)
     y1 = img_cy + img_h * (y1 - 0.5)
     y2 = img_cy + img_h * (y2 - 0.5)
+    if tex ~= nil then
+      local quad = love.graphics.newQuad(
+        img_w * x1r, img_h * y1r,
+        img_w * (x2r - x1r), img_h * (y2r - y1r),
+        img_w, img_h
+      )
+      love.graphics.draw(tex, quad, x1, y1)
+    end
     local t = love.graphics.newText(label_font, label)
     local draw_frame = function ()
       local w = 3
@@ -368,10 +377,15 @@ return function (start_at)
       love.graphics.rectangle('fill', W - (img_x0 + img_rw), img_y0, img_rw, img_rh)
       love.graphics.setColor(1, 1, 1)
       draw.img(prev_img, W - img_cx, img_cy, prev_img_w)
+      love.graphics.setColor(1, 1, 1, 0.5)
+      local prev_x0 = W - img_cx - prev_img_w / 2
+      local prev_y0 = img_cy - prev_img_h / 2
+      love.graphics.rectangle('fill', prev_x0, prev_y0, prev_img_w, prev_img_h)
       if since_reveal >= 0 then
-        draw_label(0, unpack(reveal_cur_label))
+        draw_label(0, nil, unpack(reveal_cur_label))
+        local prev_tex = draw.get(prev_img)
         for i = 1, #reveal_prev_labels do
-          draw_label(1, unpack(reveal_prev_labels[i]))
+          draw_label(1, prev_tex, unpack(reveal_prev_labels[i]))
         end
       end
     else
