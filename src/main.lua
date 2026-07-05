@@ -85,6 +85,8 @@ local mouseScene = nil
 local mouseX, mouseY = 0, 0
 local since_click = -1
 
+local isPaused = false
+
 function love.mousepressed(x, y, button, istouch, presses)
   if button ~= 1 then return end
   if lastScene ~= nil then return end
@@ -114,6 +116,8 @@ function love.keypressed(key)
       love.window.setFullscreen(not love.window.getFullscreen())
       updateLogicalDimensions()
     end
+  elseif key == 'space' then
+    isPaused = not isPaused
   elseif key == keyLCmd then isLCmdDown = true
   elseif key == keyRCmd then isRCmdDown = true
   elseif key == 'q' and (isLCmdDown or isRCmdDown) then
@@ -136,6 +140,7 @@ local timeStep = 1 / 240
 local sinceAudioUpdate = 0
 
 function love.update(dt)
+  if isPaused then return end
   T = T + dt
   local count = 0
   while T > timeStep and count < 16 do
