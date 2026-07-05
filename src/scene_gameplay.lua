@@ -89,8 +89,11 @@ return function (start_at)
   end
   push_cur_img(cur_at)
 
+  local moves_count = -1  -- Will become 0 at first initialization, see below
+
   -- Find and move to a new target
   local move_to_random_next = function (limit_one_correct_label)
+    moves_count = moves_count + 1
     local out_links = chain[cur_at].links
     if #out_links == 0 then
       return  -- XXX: This should not happen! Debug use only
@@ -312,6 +315,7 @@ return function (start_at)
 
   local t1 = love.graphics.newText(font, '验证您是人类：')
   local t2 = love.graphics.newText(font, '请在这张图片中找出上一张图片内\n出现过的同类物体')
+  local t3 = love.graphics.newText(font, '* 物体种类可能与先前不同')
   local t10 = love.graphics.newText(font, '人类置信度')
 
   local btn_flip_t = love.graphics.newText(font, '上一张')
@@ -360,6 +364,10 @@ return function (start_at)
       local title_y = 24 + math.floor(H * 0.1)
       draw(t1, 14, title_y + 0, nil, nil, 0, 0)
       draw(t2, 14, title_y + 24, nil, nil, 0, 0)
+      if moves_count >= 1 and moves_count <= 3 then
+        love.graphics.setColor(0.5, 0.5, 0.5)
+        draw(t3, 14, title_y + 64, nil, nil, 0, 0)
+      end
     end
 
     love.graphics.setColor(0.5, 0.5, 0.5)
