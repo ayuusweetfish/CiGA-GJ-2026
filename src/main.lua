@@ -81,6 +81,10 @@ _G['replaceScene'] = function (newScene, transition)
 end
 
 local mouseScene = nil
+-- XXX: Monkey patch! (cursor)
+local mouseX, mouseY = 0, 0
+local since_click = -1
+
 function love.mousepressed(x, y, button, istouch, presses)
   if button ~= 1 then return end
   if lastScene ~= nil then return end
@@ -88,12 +92,14 @@ function love.mousepressed(x, y, button, istouch, presses)
   curScene.press((x - offsX) / globalScale, (y - offsY) / globalScale)
 end
 function love.mousemoved(x, y, button, istouch)
+  mouseX, mouseY = (x - offsX) / globalScale, (y - offsY) / globalScale
   curScene.hover((x - offsX) / globalScale, (y - offsY) / globalScale)
   if mouseScene ~= curScene then return end
   curScene.move((x - offsX) / globalScale, (y - offsY) / globalScale)
 end
 function love.mousereleased(x, y, button, istouch, presses)
   if button ~= 1 then return end
+  since_click = 0
   if mouseScene ~= curScene then return end
   curScene.release((x - offsX) / globalScale, (y - offsY) / globalScale)
   mouseScene = nil
@@ -140,6 +146,12 @@ function love.update(dt)
       transitionTimer = transitionTimer + 1
     end
     curScene:update()
+
+    -- XXX: Monkey patch! (cursor)
+    if since_click >= 0 then
+      since_click = since_click + 1
+      if since_click >= 8 * 20 then since_click = -1 end
+    end
   end
 
   sinceAudioUpdate = sinceAudioUpdate + dt
@@ -176,6 +188,9 @@ transitions['fade'] = function (r, g, b)
   }
 end
 
+-- XXX: Monkey patch! (cursor)
+local draw = require 'utils/draw'
+
 function love.draw()
   love.graphics.scale(globalScale)
   love.graphics.setColor(1, 1, 1)
@@ -190,6 +205,17 @@ function love.draw()
     end
   else
     curScene.draw()
+  end
+  local cursor_index = 1
+  if since_click >= 0 then
+    cursor_index = 1 + (math.floor(since_click / 20) + 1) % 4
+  end
+  local cursor = draw.get('cursor-' .. cursor_index)
+  if cursor ~= nill then
+    love.graphics.setColor(1, 1, 1)
+    draw(cursor, math.floor(mouseX + 1.5), math.floor(mouseY + 1.5), 32, nil, 0.25, 0.25)
+    love.graphics.setColor(0, 0, 0)
+    draw(cursor, math.floor(mouseX + 0.5), math.floor(mouseY + 0.5), 32, nil, 0.25, 0.25)
   end
   love.graphics.pop()
 end

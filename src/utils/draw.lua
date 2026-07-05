@@ -22,7 +22,7 @@ local function find_imgs(path)
 end
 find_imgs('')
 local is_priority_load = function (name)
-  return name == 'blossom'
+  return name == 'blossom' or name:sub(1, 7) == 'cursor-'
 end
 table.sort(imgs_to_load, function (a, b)
   local a_priority = (is_priority_load(a) and 0 or 1)
