@@ -296,8 +296,6 @@ return function (start_at)
   local label_font = _G['global_font'](15)
 
   local draw_label = function (half, label, x1, y1, x2, y2)
-    love.graphics.setColor(1, 0.5, 0.4)
-    love.graphics.setLineWidth(W * 0.002)
     local img_cx = img_cx
     if half == 1 then img_cx = W - img_cx end
     local img_w, img_h = img_w, img_h
@@ -306,11 +304,28 @@ return function (start_at)
     x2 = img_cx + img_w * (x2 - 0.5)
     y1 = img_cy + img_h * (y1 - 0.5)
     y2 = img_cy + img_h * (y2 - 0.5)
-    love.graphics.rectangle('line', x1, y1, x2 - x1, y2 - y1)
     local t = love.graphics.newText(label_font, label)
-    love.graphics.rectangle('fill', x1, y1 - t:getHeight(), t:getWidth(), t:getHeight())
+    local draw_frame = function ()
+      local w = 3
+      love.graphics.rectangle('fill', x1, y1, x2 - x1, w)
+      love.graphics.rectangle('fill', x1, y2 - w, x2 - x1, w)
+      love.graphics.rectangle('fill', x1, y1 + w, w, y2 - y1 - w * 2)
+      love.graphics.rectangle('fill', x2 - w, y1 + w, w, y2 - y1 - w * 2)
+      love.graphics.rectangle('fill', x1, y1 - t:getHeight(), t:getWidth() + 2, t:getHeight())
+    end
+    love.graphics.push()
+    love.graphics.setColor(0, 0, 0, 0.5)
+    love.graphics.translate(1, 1)
+    draw_frame()
+    love.graphics.pop()
+    if reveal_due_to_currect then
+      love.graphics.setColor(1, 0, 0)
+    else
+      love.graphics.setColor(0, 0.2, 1)
+    end
+    draw_frame()
     love.graphics.setColor(1, 1, 1)
-    love.graphics.draw(t, x1, y1 - t:getHeight())
+    love.graphics.draw(t, x1 + 1, y1 - t:getHeight())
   end
 
   local t1 = love.graphics.newText(font, '验证您是人类：')
@@ -383,8 +398,8 @@ return function (start_at)
     if since_incorrect >= 0 then
       local x = img_cx + img_w * (incorrect_x - 0.5)
       local y = img_cy + img_h * (incorrect_y - 0.5)
-      love.graphics.setColor(1, 1, 1)
-      draw.img('blossom', x, y, 36)
+      love.graphics.setColor(1, 0, 0)
+      draw.img('incorrect', x, y)
     end
 
     if since_reveal < 0 then
