@@ -11,17 +11,27 @@ return function ()
   local start_at = 'a_7312.jpg'
   local start_img = draw.loadx('chain/' .. start_at)
 
+  local next_scene = _G['scene_gameplay'](start_at)
+  local _, x1, y1, x2, y2 = unpack(next_scene.prev_one_correct_label)
+
   local img_rcx, img_rcy = W * 0.5, H * 0.516
   local img_rw, img_rh = W * 0.55, H * 0.32
   local img_w, img_h = draw.get(start_img):getDimensions()
-  local scale = math.min(img_rw / img_w, img_rh / img_h)
-  img_w = math.floor(img_w * scale / 2 + 0.5) * 2   -- Keep even
-  img_h = math.floor(img_h * scale / 2 + 0.5) * 2
+  local img_quad = love.graphics.newQuad(
+    img_w * x1, img_h * y1,
+    img_w * (x2 - x1), img_h * (y2 - y1),
+    img_w, img_h
+  )
+  img_w = img_w * (x2 - x1)
+  img_h = img_h * (y2 - y1)
+  local img_scale = math.min(img_rw / img_w, img_rh / img_h)
+  img_w = math.floor(img_w * img_scale / 2 + 0.5) * 2   -- Keep even
+  img_h = math.floor(img_h * img_scale / 2 + 0.5) * 2
 
   local t1 = love.graphics.newText(font, '请在即将看到的图片中找到以下物体。')
 
   local btn_confirm = button(draw.get('button_ord'), function ()
-    replaceScene(_G['scene_gameplay'](start_at), _G['transitions']['hardcut']())
+    replaceScene(next_scene, _G['transitions']['hardcut']())
   end, draw.get('button_press'))
   btn_confirm.x = math.floor(W * 0.5)
   btn_confirm.y = math.floor(H * 0.75)
@@ -65,7 +75,12 @@ return function ()
     draw(t1, cx, cy - window_h / 2 + 32, nil, nil, 0.5, 0)
 
     love.graphics.setColor(1, 1, 1)
-    draw.img(start_img, img_rcx, img_rcy, img_w, img_h)
+    love.graphics.draw(
+      draw.get(start_img), img_quad,
+      img_rcx - img_w / 2,
+      img_rcy - img_h / 2,
+      0, img_scale
+    )
 
     love.graphics.setColor(1, 1, 1)
     btn_confirm.draw()

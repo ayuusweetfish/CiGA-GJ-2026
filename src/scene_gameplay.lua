@@ -90,13 +90,13 @@ return function (start_at)
   push_cur_img(cur_at)
 
   -- Find and move to a new target
-  local move_to_random_next = function ()
+  local move_to_random_next = function (limit_one_correct_label)
     local out_links = chain[cur_at].links
     if #out_links == 0 then
       return  -- XXX: This should not happen! Debug use only
     end
     local go_to = out_links[love.math.random(#out_links)]
-    correct_labels = {}
+    local correct_labels_list = {}
     local cur_labels = {}
     for i = 1, #chain[cur_at].labels do
       local label_name = chain[cur_at].labels[i][1]
@@ -105,13 +105,34 @@ return function (start_at)
     for i = 1, #chain[go_to].labels do
       local label_name = chain[go_to].labels[i][1]
       if cur_labels[label_name] then
-        correct_labels[label_name] = true
+        correct_labels_list[#correct_labels_list + 1] = label_name
       end
+    end
+    if limit_one_correct_label then
+      correct_labels_list[1] =
+        correct_labels_list[love.math.random(#correct_labels_list)]
+      correct_labels_list[2] = nil
+    end
+    correct_labels = {}
+    for i = 1, #correct_labels_list do
+      correct_labels[correct_labels_list[i]] = true
     end
     prev_at, cur_at = cur_at, go_to
     push_cur_img(cur_at)
   end
-  move_to_random_next()
+  move_to_random_next(true)
+  -- For use by `scene_intro`; this ensures only one label with its bounding box
+  for k, _ in pairs(correct_labels) do
+    for i = 1, #chain[prev_at].labels do
+      local l = chain[prev_at].labels[i]
+      local label_text, x1, y1, x2, y2 = unpack(l)
+      if label_text == k then
+        -- TODO: Random or sort by size?
+        s.prev_one_correct_label = l
+        break
+      end
+    end
+  end
 
   ------------ State ------------
 
