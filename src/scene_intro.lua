@@ -2,13 +2,18 @@ local draw = require 'utils/draw'
 local button = require 'utils/button'
 local audio = require 'audio'
 local window_frame = require 'window_frame'
+local chain = require 'chain'
 
 return function ()
   local s = {}
   local W, H = W, H
   local font = _G['global_font'](15)
 
-  local start_at = 'jam1_20.JPG'
+  -- Pick a random starting point
+  local nodes_list = {}
+  for k, _ in pairs(chain) do nodes_list[#nodes_list + 1] = k end
+
+  local start_at = nodes_list[love.math.random(#nodes_list)]
   local start_img = draw.loadx('chain/' .. start_at)
 
   local next_scene = _G['scene_gameplay'](start_at)
