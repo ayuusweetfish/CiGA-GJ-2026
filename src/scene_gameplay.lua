@@ -364,7 +364,7 @@ return function (start_at)
       local title_y = 24 + math.floor(H * 0.1)
       draw(t1, 14, title_y + 0, nil, nil, 0, 0)
       draw(t2, 14, title_y + 24, nil, nil, 0, 0)
-      if moves_count >= 1 and moves_count <= 3 then
+      if moves_count >= 1 and moves_count <= 2 then
         love.graphics.setColor(0.5, 0.5, 0.5)
         draw(t3, 14, title_y + 64, nil, nil, 0, 0)
       end
