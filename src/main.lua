@@ -15,7 +15,7 @@ love.graphics.setDefaultFilter('nearest', 'nearest')
 local globalScale, Wx, Hx, offsX, offsY
 
 local updateLogicalDimensions = function ()
-  love.window.setTitle('Game')
+  love.window.setTitle('我是人類')
   local wDev, hDev = love.graphics.getDimensions()
   globalScale = math.min(wDev / W, hDev / H)
   Wx = wDev / globalScale
