@@ -14,6 +14,10 @@ return function ()
   for k, _ in pairs(chain) do nodes_list[#nodes_list + 1] = k end
 
   local start_at = nodes_list[love.math.random(#nodes_list)]
+  local override_start = os.getenv('ANCHOR_START')
+  if override_start ~= nil and chain[override_start] ~= nil then
+    start_at = override_start
+  end
   local start_img = draw.loadx('chain/' .. start_at)
 
   local next_scene = _G['scene_gameplay'](start_at)
