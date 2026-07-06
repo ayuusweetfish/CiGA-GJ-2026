@@ -10,13 +10,16 @@ return function (drawable, fn, alt_drawable)
   local w, h = drawable:getDimensions()
   local scale = 1
 
+  -- Trigger region size
+  local rw, rh = math.max(w, 36), math.max(h, 36)
+
   local held = false
   s.inside = false
 
   s.press = function (x, y)
     if not s.enabled then return false end
-    if x >= s.x - w/2 and x <= s.x + w/2 and
-       y >= s.y - h/2 and y <= s.y + h/2 then
+    if x >= s.x - rw/2 and x <= s.x + rw/2 and
+       y >= s.y - rh/2 and y <= s.y + rh/2 then
       held = true
       s.inside = true
       return true
@@ -28,8 +31,8 @@ return function (drawable, fn, alt_drawable)
   s.move = function (x, y)
     if not held then return false end
     s.inside =
-      x >= s.x - w/2 and x <= s.x + w/2 and
-      y >= s.y - h/2 and y <= s.y + h/2
+      x >= s.x - rw/2 and x <= s.x + rw/2 and
+      y >= s.y - rh/2 and y <= s.y + rh/2
     return true
   end
 
