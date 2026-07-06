@@ -1,9 +1,14 @@
 local draw = require 'utils/draw'
+local slice_9 = require 'utils/slice_9'
 
 local window_titles = {}
+local window_slice_9
 
 local draw_window = function (title, w, h, cx, cy)
-  draw.img('window', cx, cy, w, h)
+  window_slice_9 = window_slice_9 or
+    slice_9(draw.get('window'), 24)
+  -- draw.img('window', cx, cy, w, h)
+  window_slice_9.draw(cx - w / 2, cy - h / 2, w, h)
   draw.img('window_logo', cx - w/2 + 4, cy - h/2 + 5, nil, nil, 0, 0)
   local title_text = window_titles[title]
   if not title_text then
