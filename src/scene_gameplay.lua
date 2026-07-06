@@ -259,6 +259,7 @@ return function (start_at)
     x2 = img_cx + img_w * (x2 - 0.5)
     y1 = img_cy + img_h * (y1 - 0.5)
     y2 = img_cy + img_h * (y2 - 0.5)
+    local w = 3
     if tex ~= nil then
       local quad = love.graphics.newQuad(
         img_w * x1r, img_h * y1r,
@@ -267,9 +268,10 @@ return function (start_at)
       )
       love.graphics.draw(tex, quad, x1, y1)
     end
+    x1, y1 = x1 - w, y1 - w
+    x2, y2 = x2 + w, y2 + w
     local t = love.graphics.newText(label_font, label)
     local draw_frame = function ()
-      local w = 3
       love.graphics.rectangle('fill', x1, y1, x2 - x1, w)
       love.graphics.rectangle('fill', x1, y2 - w, x2 - x1, w)
       love.graphics.rectangle('fill', x1, y1 + w, w, y2 - y1 - w * 2)
