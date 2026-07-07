@@ -11,7 +11,7 @@ return function (drawable, fn, alt_drawable)
   local scale = 1
 
   -- Trigger region size
-  local rw, rh = math.max(w, 36), math.max(h, 36)
+  local rw, rh = math.max(w, 48), math.max(h, 48)
 
   local held = false
   s.inside = false
